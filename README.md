@@ -1,66 +1,38 @@
-# AlphAction
+# CatchNet
+<p>서비스 Catch는 대한민국 어린이집 99%에 이미 설치되어 있는 CCTV 인프라에 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
 
-AlphAction aims to detect the actions of multiple persons in videos. It is 
-**the first open-source project that achieves 30+ mAP (32.4 mAP) with single 
-model on AVA dataset.** 
+<br>
 
-This project is the official implementation of paper 
-[Asynchronous Interaction Aggregation for Action Detection](https://arxiv.org/abs/2004.07485) (**ECCV 2020**), authored
-by Jiajun Tang*, Jin Xia* (equal contribution), Xinzhi Mu, [Bo Pang](https://bopang1996.github.io/), 
-[Cewu Lu](http://mvig.sjtu.edu.cn/) (corresponding author). 
+## 환경 구성
+<p>
 
-<br/>
-<div align="center">
-  <img  src="https://user-images.githubusercontent.com/22748802/94115535-71fc9580-fe7c-11ea-98af-d8e9a8a2de82.gif" width=416 alt="demo1">
-  <img  src="https://user-images.githubusercontent.com/22748802/94115605-8ccf0a00-fe7c-11ea-8855-ab84232612a0.gif" width=416 alt="demo2">
-</div>
-<div align="center">
-  <img  src="https://user-images.githubusercontent.com/22748802/94115715-b12ae680-fe7c-11ea-8180-8e3d7f57a4bb.gif" width=836 alt="demo3">
-</div>
-<br/>
-
-## Demo Video
-
-[![AlphAction demo video](https://user-images.githubusercontent.com/22748802/94115680-a83a1500-fe7c-11ea-878c-536db277fba7.jpg)](https://www.youtube.com/watch?v=TdGmbOJ9hoE "AlphAction demo video")
-[[YouTube]](https://www.youtube.com/watch?v=TdGmbOJ9hoE) [[BiliBili]](https://www.bilibili.com/video/BV14A411J7Xv)
-
-## Installation 
-
-You need first to install this project, please check [INSTALL.md](INSTALL.md)
-
-## Data Preparation
-
-To do training or inference on AVA dataset, please check [DATA.md](DATA.md)
-for data preparation instructions.
-
-## Model Zoo
-
-Please see [MODEL_ZOO.md](MODEL_ZOO.md) for downloading models.
-
-## Training and Inference
-
-To do training or inference with AlphAction, please refer to [GETTING_STARTED.md](GETTING_STARTED.md).
-
-## Demo Program
-
-To run the demo program on video or webcam, please check the folder [demo](demo).
-We select 15 common categories from the 80 action categories of AVA, and 
-provide a practical model which achieves high accuracy (about 70 mAP) on these categories. 
-
-## Acknowledgement
-We thankfully acknowledge the computing resource support of Huawei Corporation
-for this project. 
-
-## Citation
-
-If this project helps you in your research or project, please cite
-this paper:
 
 ```
-@inproceedings{tang2020asynchronous,
-  title={Asynchronous Interaction Aggregation for Action Detection},
-  author={Tang, Jiajun and Xia, Jin and Mu, Xinzhi and Pang, Bo and Lu, Cewu},
-  booktitle={Proceedings of the European conference on computer vision (ECCV)},
-  year={2020}
-}
+conda create -n CatchNet python=3.7 -y
+conda activate CatchNet
+conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=11 -c pytorch -c conda-forge -y
+# install pytorch with the same cuda version as in your environment
+# cuda_version=$(nvcc --version | grep -oP '(?<=release )[\d\.]*?(?=,)')
+# conda install pytorch torchvision cudatoolkit=$cuda_version -c pytorch
+
+conda install av -c conda-forge -y
+conda install cython -y
+
+gt clone https://git.swmgit.org/swm-12/12_swm11/i-mind.git
+cd i-mind/CatchNet
+pip install -e . # Other dependicies will be installed here
+pip install -r requirements.txt
+pip install tensorflow
 ```
+</p>
+
+<br>
+
+<p>
+
+본 저장소는 다음과 같은 오픈소스 코드들을 참고하여 작성되었다.
+- [YOLOv5 + DeepSORT](https://github.com/mikel-brostrom/Yolov5_DeepSort_Pytorch)
+- [Towards-Realtime-MOT(JDE)](https://github.com/Zhongdao/Towards-Realtime-MOT)
+- [Multi-Camera-Person-Tracking-and-Re-Identification](https://github.com/samihormi/Multi-Camera-Person-Tracking-and-Re-Identification)
+- [AlphAction](https://github.com/MVIG-SJTU/AlphAction)
+</p>
