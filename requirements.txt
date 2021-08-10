@@ -1,0 +1,14 @@
+Pillow
+six
+scipy
+opencv-python
+matplotlib
+tb-nightly
+future
+yacs
+gdown
+flake8
+yapf
+isort
+imageio
+scikit-learn==0.22.2
