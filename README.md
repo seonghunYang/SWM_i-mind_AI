@@ -28,6 +28,19 @@ pip install tensorflow
 
 <br>
 
+## 디렉토리 구조
+<p>
+
+  <div align="center">
+    <figure>
+        <img src="https://drive.google.com/uc?export=view&id=1vAnimz8Bojgd-e-xl-_1IbHot-owkzA1" alt="CatchNet 디렉토리 구조">
+        <div align="center"><figcation>CatchNet 디렉토리 구조</figcation></div>
+    </figure>
+  </div>
+</p>
+
+<br>
+
 <p>
 
 본 저장소는 다음과 같은 오픈소스 코드들을 참고하여 작성되었다.
