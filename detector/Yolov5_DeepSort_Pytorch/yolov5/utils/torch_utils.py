@@ -63,11 +63,16 @@ def git_describe(path=Path(__file__).parent):  # path must be a directory
 def select_device(device='', batch_size=None):
     # device = 'cpu' or '0' or '0,1,2,3'
     s = f'YOLOv5 🚀 {git_describe() or date_modified()} torch {torch.__version__} '  # string
-    cpu = device.lower() == 'cpu'
+    device = str(device)
+    try:
+        cpu = device.lower() == 'cpu'
+    except:
+        cpu = False
     if cpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force torch.cuda.is_available() = False
     elif device:  # non-cpu device requested
-        os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
+        # os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
+        os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # set environment variable
         assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
 
     cuda = not cpu and torch.cuda.is_available()
