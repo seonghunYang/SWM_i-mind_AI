@@ -16,6 +16,10 @@ def get_detector(opt=None):
         from detector.tracker_api import Tracker
         from detector.tracker_cfg import cfg
         return Tracker(cfg, opt)
+    elif opt.detector == 'tracker2':
+        from detector.tracker2_api import Tracker
+        from detector.tracker2_cfg import cfg
+        return Tracker(cfg, opt)
     else:
         raise NotImplementedError
 
