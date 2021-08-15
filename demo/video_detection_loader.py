@@ -2,7 +2,7 @@ from itertools import count
 from threading import Thread
 from queue import Queue
 
-import cv2
+import cv2, sys
 import numpy as np
 from time import sleep
 from tqdm import tqdm
@@ -11,8 +11,12 @@ import queue
 import torch
 import torch.multiprocessing as mp
 from torchvision.transforms import functional as F
+from pathlib import Path
 
 from detector.apis import get_detector
+from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.datasets import LoadImages, LoadStreams
+from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.general import non_max_suppression, scale_coords, xyxy2xywh
+from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.torch_utils import time_synchronized
 
 class Resize(object):
     def __init__(self, min_size, max_size):
@@ -53,6 +57,8 @@ class VideoDetectionLoader(object):
     This Class takes the video from the source (video file or camera) and tracks the person.
     '''
     def __init__(self, cfg, track_queue, action_queue, predictor_process):
+        # cfg.detector = "tracker2"
+        self.cfg = cfg
         self.detector = get_detector(cfg)
         self.input_path = cfg.input_path
 
@@ -80,7 +86,10 @@ class VideoDetectionLoader(object):
 
     def start(self):
         # start a thread to pre process images for object detection
-        self.image_preprocess_worker = self.start_worker(self.frame_preprocess)
+        if self.cfg.detector == 'tracker':
+            self.image_preprocess_worker = self.start_worker(self.frame_preprocess)
+        elif self.cfg.detector == 'tracker2':
+            self.image_preprocess_worker = self.start_worker(self.yolo5_track)
         return self
 
     def stop(self):
@@ -128,9 +137,115 @@ class VideoDetectionLoader(object):
                 else:
                     sleep(0.1)
 
+    def yolo5_track(self):
+        dataset = LoadImages(self.input_path, img_size=self.detector.imgsz)
+
+        cur_millis = 0
+
+        for frame_idx, (path, img, im0s, stream) in enumerate(dataset):
+
+            last_millis = cur_millis
+            cur_millis = stream.get(cv2.CAP_PROP_POS_MSEC)
+
+            if not self.realtime and self.duration_mill != -1 and cur_millis > self.start_mill + self.duration_mill:
+                break
+
+            img = torch.from_numpy(img).to(self.detector.device)
+            
+            img = img.half() if self.detector.half else img.float()  # uint8 to fp16/32
+            img /= 255.0  # 0 - 255 to 0.0 - 1.0
+            if img.ndimension() == 3:
+                img = img.unsqueeze(0)
+
+            # Inference
+            # t1 = time_synchronized()
+            pred = self.detector.model(img, augment=self.detector.augment)[0]
+
+            # Apply NMS
+            pred = non_max_suppression(
+                pred, self.detector.cfg.conf_thres, self.detector.cfg.iou_thres, classes=self.detector.cfg.classes, agnostic=self.detector.cfg.agnostic_nms)
+            # t2 = time_synchronized()
+
+            # Process detections
+            img_det = None
+
+            for i, det in enumerate(pred):  # detections per image
+                if self.detector.webcam:  # batch_size >= 1
+                    p, s, im0 = path[i], '%g: ' % i, im0s[i].copy()
+                else:
+                    p, s, im0 = path, '', im0s
+
+                s += '%gx%g ' % img.shape[2:]  # print string
+                # save_path = str(Path(out) / Path(p).name)
+
+                if det is not None and len(det):
+                    # Rescale boxes from img_size to im0 size
+                    det[:, :4] = scale_coords(
+                        img.shape[2:], det[:, :4], im0.shape).round()
+
+                    # Print results
+                    for c in det[:, -1].unique():
+                        n = (det[:, -1] == c).sum()  # detections per class
+                        s += '%g %ss, ' % (n, self.detector.names[int(c)])  # add to string
+                        
+                    xywhs = xyxy2xywh(det[:, 0:4]) # det[:, 0:4] => [x1, y1, x2, y2]
+                    confs = det[:, 4]
+                    clss = det[:, 5]
+
+                    # pass detections to deepsort
+                    outputs = self.detector.deepsort.update(xywhs.cpu(), confs.cpu(), clss, im0)
+
+                    orig_img = im0s[:, :, ::-1]
+                    bboxes = []
+                    scores = []
+                    ids = []
+
+                    if len(outputs) > 0:
+                        for j, (output, conf) in enumerate(zip(outputs, confs)): 
+                            bboxes.append(output[0:4])
+                            scores.append(conf)
+                            ids.append(output[4])
+
+                    img_det = (orig_img, bboxes, scores, ids)
+                        
+                else:
+                    self.detector.deepsort.increment_ages()
+                    img_det = (orig_img, None, None, None)
+
+                self.image_postprocess(img_det, (im0s, cur_millis))
+                    
+        self.wait_and_put(self.track_queue, (None, None, None, None, None))
+        self.wait_and_put(self.action_queue, ("Done", self.videoinfo["frameSize"]))
+        #self.wait_till_empty(self.action_queue)
+        #self.wait_till_empty(self.track_queue)
+
+        # This process needs to be finished after the predictor process
+        # Otherwise, it will cause FileNotFoundError, if predictor is
+        # overwhelmed
+        predictor_process = self.predictor_process.value
+        if predictor_process != -1:
+            tqdm.write("Tracking finished. Showing feature extraction progress bar [ ready length / total length ](in msec).")
+            initial = predictor_process - self.start_mill
+            pbar = tqdm(total=int(last_millis)-self.start_mill, initial=initial, desc="Feature Extraction")
+            last_pos = initial
+            while predictor_process != -1:
+                pbar.update(predictor_process-last_pos)
+                if self.stopped:
+                    break
+                last_pos = predictor_process
+                # try not to read shared value too frequent
+                sleep(0.1)
+                predictor_process = self.predictor_process.value
+            pbar.update(int(last_millis)-last_pos)
+            pbar.close()
+
+        stream.release()
+
     def frame_preprocess(self):
         stream = cv2.VideoCapture(self.input_path)
         assert stream.isOpened(), 'Cannot capture source'
+        self.nframes = int(stream.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"Video total {self.nframes} frames loaded.")
 
         if not self.realtime:
             stream.set(cv2.CAP_PROP_POS_MSEC, self.start_mill)
