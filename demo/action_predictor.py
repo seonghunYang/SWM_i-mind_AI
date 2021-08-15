@@ -348,7 +348,6 @@ class AVAPredictorWorker(object):
         In realtime mode, it will compute the action scores right after the feature update.
         In video mode, the prediction won't be done until an explicit call of compute_prediction()
         '''
-
         empty_flag = False
         pred_num_cnt = 0
 
@@ -440,7 +439,12 @@ class AVAPredictorWorker(object):
                     pred_num_cnt += 1
                 else:
                     # if not realtime, timestamps will be saved and the predictions will be computed later.
-                    self.timestamps.append((center_timestamp, video_size, person_ids[:, 0]))
+
+                    if isinstance(person_ids, torch.Tensor):
+                        self.timestamps.append((center_timestamp, video_size, person_ids[:, 0]))
+                    elif isinstance(person_ids, list):
+                        self.timestamps.append((center_timestamp, video_size, person_ids))
+
                     ready_num = self.ava_predictor.check_ready_timestamp()
                     for timestamp_idx in range(pred_num_cnt, pred_num_cnt + ready_num):
                         center_timestamp, video_size, ids = self.timestamps[timestamp_idx]
