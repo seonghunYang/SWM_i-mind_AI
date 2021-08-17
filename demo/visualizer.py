@@ -194,7 +194,6 @@ class AVAVisualizer(object):
         self.category_trans = int(0.6 * 255)
 
         self.action_dictionary = dict()
-        self.final_fuse_id_reverse = None
 
         if realtime:
             # Output Video
@@ -255,7 +254,7 @@ class AVAVisualizer(object):
         # tqdm.write("load frame closed")
 
     def _wirte_frame(self, output_path):
-        # final_fuse_id_reverse = self.fuse_queue.get()
+        final_fuse_id_reverse = self.fuse_queue.get()
         width = self.vid_info["width"]
         height = self.vid_info["height"]
         fps = self.vid_info["fps"]
@@ -307,7 +306,7 @@ class AVAVisualizer(object):
 
             if boxes is not None:
                 self.update_action_dictionary(scores, ids)
-                last_visual_mask = self.visual_result(boxes, ids)
+                last_visual_mask = self.visual_result(boxes, ids, final_fuse_id_reverse)
                 new_frame = self.visual_frame(frame, last_visual_mask)
                 out_vid.write(new_frame)
             else:
@@ -385,7 +384,7 @@ class AVAVisualizer(object):
                     "bg_colors": bg_colors,
                 }
 
-    def visual_result(self, boxes, ids):
+    def visual_result(self, boxes, ids, final_fuse_id_reverse):
         bboxes = boxes
         ids = ids
 
@@ -397,7 +396,7 @@ class AVAVisualizer(object):
 
         for box, id in zip(bboxes, map(int, ids)):
             caption_and_color = self.action_dictionary.get(id, None)
-            # id = final_fuse_id_reverse.get(id, id)
+            id = final_fuse_id_reverse.get(id, id)
 
             if caption_and_color is None:
                 captions = []
