@@ -68,9 +68,15 @@ pip install tensorflow
 <p>
 
 
+분류 | 모델(다운로드 링크) | 경로
+:-: | :-: | :-:
+객체 탐지 | [yolov3-spp.weights](https://drive.google.com/open?id=1T13mXnPLu8JRelwh60BRR21f2TlGWBAM) | ./data/models/detector_models/
+객체 추적 | [crowdhuman_yolov5m.pt](https://drive.google.com/file/d/1gglIwqxaH2iTvy6lZlXuAcMpd_U0GCUb/view?usp=sharing) | ./detector/Yolov5_DeepSort_Pytorch/yolov5/weights/
+객체 재추적(Re-ID) | [model.pth](https://drive.google.com/file/d/1_LoiFYlsVu3ervIidYIMopodyBLswmi4/view?usp=sharing) | ./demo/model_data/models/
+행동 인식 | [resnet101_8x8f_denseserial](https://drive.google.com/file/d/1DKHo0XoBjrTO2fHTToxbV0mAPzgmNH3x/view?usp=sharing) | ./data/models/aia_models/
 </p>
 
-<br>
+<br><br>
 
 <p>
 
