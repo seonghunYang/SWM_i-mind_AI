@@ -1,5 +1,16 @@
 # CatchNet
-<p>서비스 Catch는 대한민국 어린이집 99%에 이미 설치되어 있는 CCTV 인프라에 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
+<p>CatchNet은 서비스 Catch에서 사용하는 AI 파이프라인 네트워크이다. 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 어린이집 CCTV 환경에서 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
+
+<br>
+
+## 동작 환경
+<p>
+
+- RAM: 최소 8GB (16GB 이상 권장)
+- GPU: GTX 960 이상
+- OS: Ubuntu 20.04
+- Tools: CUDA, Python, Anaconda, PyTorch, Tensorflow 2.0+
+</p>
 
 <br>
 
@@ -41,9 +52,29 @@ pip install tensorflow
 
 <br>
 
+## Model Zoo
+### Pre-trained Models
+<p>커스텀 데이터셋을 학습시켜 본인만의 모델을 만들고싶은 분은 아래 Backbone 모델을 활용하세요.</p>
 <p>
 
-본 저장소는 다음과 같은 오픈소스 코드들을 참고하여 작성되었다.
+| backbone | pre-train | frame length | sample rate | top-1 | top-5 | model |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+| SlowFast-R50 | Kinetics-700 | 4 | 16 | 66.34 | 86.66 | [[link]](https://drive.google.com/file/d/1bNcF295jxY4Zbqf0mdtsw9QifpXnvOyh/view?usp=sharing) |
+| SlowFast-R101 | Kinetics-700 | 8 | 8 | 69.32 | 88.84 | [[link]](https://drive.google.com/file/d/1v1FdPUXBNRj-oKfctScT4L4qk8L1k3Gg/view?usp=sharing) |
+</p>
+
+### Models
+<p>바로 데모를 수행하고 싶으신 분은 아래 모델을 다운받아 안내드리는 경로에 위치시켜주세요.</p>
+<p>
+
+
+</p>
+
+<br>
+
+<p>
+
+본 저장소는 다음과 같은 오픈소스 코드들을 참고하여 작성되었습니다.
 - [YOLOv5 + DeepSORT](https://github.com/mikel-brostrom/Yolov5_DeepSort_Pytorch)
 - [Towards-Realtime-MOT(JDE)](https://github.com/Zhongdao/Towards-Realtime-MOT)
 - [Multi-Camera-Person-Tracking-and-Re-Identification](https://github.com/samihormi/Multi-Camera-Person-Tracking-and-Re-Identification)
