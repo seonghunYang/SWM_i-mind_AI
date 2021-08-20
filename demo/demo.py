@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 import numpy as np
 import torch
-from reid import REID
-import operator
+# from reid import REID
+# import operator
 
 from visualizer import AVAVisualizer
 from action_predictor import AVAPredictorWorker
@@ -70,6 +70,12 @@ def main():
         default=0.5,
         help="The threshold of visualizer",
         type=float,
+    )
+    parser.add_argument(
+        "--show-id",
+        default=False,
+        help="visualize track ids",
+        action="store_true",
     )
     parser.add_argument(
         "--start",
@@ -128,19 +134,17 @@ def main():
     args.detector = "tracker2"
     args.debug = False
 
-    reid = REID()
-    print("ReID model loaded")
+    # reid = REID()
+    # print("ReID model loaded")
 
     if args.webcam:
         print('Starting webcam demo, press Ctrl + C to terminate...')
     else:
         print('Starting video demo, video path: {}'.format(args.video_path))
 
-    fuse_queue = torch.multiprocessing.Queue()
-
+    # fuse_queue = torch.multiprocessing.Queue()
     # Initialise Visualizer
     video_writer = AVAVisualizer(
-        fuse_queue,
         args.input_path,
         args.output_path,
         args.realtime,
@@ -149,24 +153,24 @@ def main():
         (not args.hide_time),
         confidence_threshold = args.visual_threshold,
         common_cate = args.common_cate,
+        show_id = args.show_id
     )
 
     torch.multiprocessing.set_start_method('forkserver', force=True)
     torch.multiprocessing.set_sharing_strategy('file_system')
     
-
     ava_predictor_worker = AVAPredictorWorker(args)
     pred_done_flag = False
 
-    track_cnt = dict()
-    images_by_id = dict()
-    ids_per_frame = []
+    # track_cnt = dict()
+    # images_by_id = dict()
+    # ids_per_frame = []
     
     print("Showing tracking progress bar (in fps). Other processes are running in the background.")
     try:
         for i in tqdm(count(), desc="Tracker Progress", unit=" frame"):
             with torch.no_grad():
-                (frame, orig_img, boxes, scores, ids) = ava_predictor_worker.read_track()
+                (orig_img, boxes, scores, ids) = ava_predictor_worker.read_track()
 
                 if orig_img is None:
                     if not args.realtime:
@@ -179,16 +183,16 @@ def main():
                     if not flag:
                         break
                 else:
-                    try:
-                        ids_per_frame.append(set(map(int, ids)))
-                        for bbox, id in zip(boxes, map(int, ids)):
-                            if id not in images_by_id:
-                                images_by_id[id] = [frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]]
-                            else:
-                                images_by_id[id].append(frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
+                    # try:
+                    #     ids_per_frame.append(set(map(int, ids)))
+                    #     for bbox, id in zip(boxes, map(int, ids)):
+                    #         if id not in images_by_id:
+                    #             images_by_id[id] = [frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]]
+                    #         else:
+                    #             images_by_id[id].append(frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
 
-                    except TypeError:
-                        pass
+                    # except TypeError:
+                    #     pass
                     video_writer.send_track((boxes, ids))
                     while not pred_done_flag:
                         result = ava_predictor_worker.read()
@@ -202,70 +206,71 @@ def main():
         print("Keyboard Interrupted")
 
     if not args.realtime:
-        threshold = 280
-        exist_ids = set()
-        final_fuse_id = dict()
+        # threshold = 280
+        # exist_ids = set()
+        # final_fuse_id = dict()
 
-        print('Total IDs = ',len(images_by_id))
-        feats = dict()
-        for i in images_by_id:
-            try:
-                feats[i] = reid._features(images_by_id[i])
-                # set에 변동이 없도록 루프하는 .
+        # print('Total IDs = ',len(images_by_id))
+        # feats = dict()
+        # for i in images_by_id:
+        #     try:
+        #         feats[i] = reid._features(images_by_id[i])
+        #         # set에 변동이 없도록 루프하는 .
 
-            except ValueError:
-                pass
+        #     except ValueError:
+        #         pass
 
-        for f in ids_per_frame:
-            if f:
-                if len(exist_ids) == 0:
-                    for i in f:
-                        final_fuse_id[i] = [i]
+        # for f in ids_per_frame:
+        #     if f:
+        #         if len(exist_ids) == 0:
+        #             for i in f:
+        #                 final_fuse_id[i] = [i]
 
-                    exist_ids = exist_ids or f
-                else:
-                    new_ids = f-exist_ids
-                    for nid in new_ids:
-                        dis = []
-                        if len(images_by_id[nid]) < 10:
-                            exist_ids.add(nid)
-                            continue
-                        unpickable = []
-                        for i in f: # f = ids
-                            for key,item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
-                                if i in item:
-                                    unpickable += final_fuse_id[key]
-                        print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
-                        for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
-                            try:
-                                # feats[id] -> 2차원 배열
-                                # tmp = np.mean(reid.compute_distance(feats[nid], feats[oid]))
-                                tmp = np.min(reid.compute_distance(feats[nid], feats[oid]))
-                                print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
-                                dis.append([oid, tmp])
-                            except KeyError:
-                                pass
-                        exist_ids.add(nid)
-                        print("type(nid) = {}".format(type(nid)))
-                        print("nid = {}".format(nid))
-                        if not dis:
-                            final_fuse_id[nid] = [nid]
-                            continue
-                        dis.sort(key=operator.itemgetter(1))
-                        if dis[0][1] < threshold:
-                            combined_id = dis[0][0]
-                            images_by_id[combined_id] += images_by_id[nid]
-                            final_fuse_id[combined_id].append(nid)
-                        else:
-                            final_fuse_id[nid] = [nid]
+        #             exist_ids = exist_ids or f
+        #         else:
+        #             new_ids = f-exist_ids
+        #             for nid in new_ids:
+        #                 dis = []
+        #                 if len(images_by_id[nid]) < 10:
+        #                     exist_ids.add(nid)
+        #                     continue
+        #                 unpickable = []
+        #                 for i in f: # f = ids
+        #                     for key,item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
+        #                         if i in item:
+        #                             unpickable += final_fuse_id[key]
+        #                 print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
+        #                 for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
+        #                     try:
+        #                         # feats[id] -> 2차원 배열
+        #                         # tmp = np.mean(reid.compute_distance(feats[nid], feats[oid]))
+        #                         tmp = np.min(reid.compute_distance(feats[nid], feats[oid]))
+        #                         print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
+        #                         dis.append([oid, tmp])
+        #                     except KeyError:
+        #                         pass
+        #                 exist_ids.add(nid)
+        #                 print("type(nid) = {}".format(type(nid)))
+        #                 print("nid = {}".format(nid))
+        #                 if not dis:
+        #                     final_fuse_id[nid] = [nid]
+        #                     continue
+        #                 dis.sort(key=operator.itemgetter(1))
+        #                 if dis[0][1] < threshold:
+        #                     combined_id = dis[0][0]
+        #                     images_by_id[combined_id] += images_by_id[nid]
+        #                     final_fuse_id[combined_id].append(nid)
+        #                 else:
+        #                     final_fuse_id[nid] = [nid]
 
-        print('Final ids and their sub-ids:', final_fuse_id)
-        final_fuse_id_reverse = dict()
-        for final_id, sub_ids in final_fuse_id.items():
-            for sub_id in sub_ids:
-                final_fuse_id_reverse[sub_id] = final_id
+        # print('Final ids and their sub-ids:', final_fuse_id)
+        # final_fuse_id_reverse = dict()
+        # for final_id, sub_ids in final_fuse_id.items():
+        #     for sub_id in sub_ids:
+        #         final_fuse_id_reverse[sub_id] = final_id
         # for passing 'final_fuse_id_reverse' to video_writer
-        fuse_queue.put(final_fuse_id_reverse)
+        # final_fuse_id_reverse = dict()
+        # fuse_queue.put(final_fuse_id_reverse)
         # print("final_fuse_id_reverse = {}".format(final_fuse_id_reverse))
 
         # print('MOT took {} seconds'.format(int(time.time() - t1)))

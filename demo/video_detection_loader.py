@@ -214,7 +214,7 @@ class VideoDetectionLoader(object):
 
                 self.image_postprocess(img_det, (im0s, cur_millis))
                     
-        self.wait_and_put(self.track_queue, (None, None, None, None, None))
+        self.wait_and_put(self.track_queue, (None, None, None, None))
         self.wait_and_put(self.action_queue, ("Done", self.videoinfo["frameSize"]))
         #self.wait_till_empty(self.action_queue)
         #self.wait_till_empty(self.track_queue)
@@ -356,7 +356,7 @@ class VideoDetectionLoader(object):
             self.wait_and_put(self.action_queue, (input, self.videoinfo["frameSize"]))
 
             # Only return the tracking results to main thread
-            self.wait_and_put(self.track_queue, (frame, orig_img, boxes, scores, ids))
+            self.wait_and_put(self.track_queue, (orig_img, boxes, scores, ids))
 
     def read_track(self):
         return self.wait_and_get(self.track_queue)

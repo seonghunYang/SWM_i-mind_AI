@@ -147,7 +147,6 @@ class AVAVisualizer(object):
     ]
     def __init__(
             self,
-            fuse_queue,
             video_path,
             output_path,
             realtime,
@@ -157,6 +156,7 @@ class AVAVisualizer(object):
             confidence_threshold=0.5,
             exclude_class=None,
             common_cate=False,
+            show_id=False,
     ):
         self.vid_info = cv2_video_info(video_path)
         fps = self.vid_info["fps"]
@@ -170,7 +170,8 @@ class AVAVisualizer(object):
         self.duration = duration
         self.show_time =  show_time
         self.confidence_threshold = confidence_threshold
-        self.fuse_queue = fuse_queue
+        self.show_id = show_id
+        # self.fuse_queue = fuse_queue
         if common_cate:
             self.cate_to_show = self.COMMON_CATES
             self.category_split = (6, 11)
@@ -254,7 +255,7 @@ class AVAVisualizer(object):
         # tqdm.write("load frame closed")
 
     def _wirte_frame(self, output_path):
-        final_fuse_id_reverse = self.fuse_queue.get()
+        # final_fuse_id_reverse = self.fuse_queue.get()
         width = self.vid_info["width"]
         height = self.vid_info["height"]
         fps = self.vid_info["fps"]
@@ -306,7 +307,7 @@ class AVAVisualizer(object):
 
             if boxes is not None:
                 self.update_action_dictionary(scores, ids)
-                last_visual_mask = self.visual_result(boxes, ids, final_fuse_id_reverse)
+                last_visual_mask = self.visual_result(boxes, ids)
                 new_frame = self.visual_frame(frame, last_visual_mask)
                 out_vid.write(new_frame)
             else:
@@ -384,7 +385,7 @@ class AVAVisualizer(object):
                     "bg_colors": bg_colors,
                 }
 
-    def visual_result(self, boxes, ids, final_fuse_id_reverse):
+    def visual_result(self, boxes, ids):
         bboxes = boxes
         ids = ids
 
@@ -396,7 +397,7 @@ class AVAVisualizer(object):
 
         for box, id in zip(bboxes, map(int, ids)):
             caption_and_color = self.action_dictionary.get(id, None)
-            id = final_fuse_id_reverse.get(id, id)
+            # id = final_fuse_id_reverse.get(id, id)
 
             if caption_and_color is None:
                 captions = []
@@ -410,7 +411,10 @@ class AVAVisualizer(object):
             x1, y1, x2, y2 = box.tolist()
             overlay = Image.new("RGBA", result_vis.size, (0, 0, 0, 0))
             trans_draw = ImageDraw.Draw(overlay)
-            caption_sizes = [trans_draw.textsize(caption, font=self.font) for caption in captions]
+            if self.show_id:
+                caption_sizes = [trans_draw.textsize(str(id)+" "+caption, font=self.font) for caption in captions]
+            else:
+                caption_sizes = [trans_draw.textsize(caption, font=self.font) for caption in captions]
             caption_widths, caption_heights = list(zip(*caption_sizes))
             max_height = max(caption_heights)
             rec_height = int(round(1.8 * max_height))
@@ -430,8 +434,12 @@ class AVAVisualizer(object):
                 text_pos = (r_x1 + width_pad, r_y1 + height_pad)
 
                 trans_draw.rectangle(rec_pos, fill=self.category_colors[bg_colors[i]] + (self.category_trans,))
-                trans_draw.text(text_pos, str(id)+" "+caption, fill=(255, 255, 255, self.category_trans), font=self.font,
-                                align="center")
+                if self.show_id:
+                    trans_draw.text(text_pos, str(id)+" "+caption, fill=(255, 255, 255, self.category_trans),
+                                    font=self.font, align="center")
+                else:
+                    trans_draw.text(text_pos, caption, fill=(255, 255, 255, self.category_trans),
+                                    font=self.font, align="center")
 
             result_vis = Image.alpha_composite(result_vis, overlay)
 
