@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from PIL import Image, ImageFont, ImageDraw
 import torch.multiprocessing as mp
+from catch_logger import PersonalLogger
 
 cv2.setNumThreads(0)
 
@@ -195,6 +196,8 @@ class AVAVisualizer(object):
         self.category_trans = int(0.6 * 255)
 
         self.action_dictionary = dict()
+        self.personal_logger = PersonalLogger('./logs')
+        self.frame_num = 0
 
         if realtime:
             # Output Video
@@ -272,6 +275,7 @@ class AVAVisualizer(object):
             result, timestamp, result_ids = result
 
         while has_frame:
+            self.frame_num += 1
             track_result = self.track_queue.get()
 
             # read frame
@@ -308,6 +312,11 @@ class AVAVisualizer(object):
             if boxes is not None:
                 self.update_action_dictionary(scores, ids)
                 last_visual_mask = self.visual_result(boxes, ids)
+
+                # Logging
+                if self.personal_logger.persons:
+                    self.personal_logger.log(self.frame_num)
+
                 new_frame = self.visual_frame(frame, last_visual_mask)
                 out_vid.write(new_frame)
             else:
@@ -408,7 +417,7 @@ class AVAVisualizer(object):
 
             if len(captions) == 0:
                 continue
-            x1, y1, x2, y2 = box.tolist()
+            x1, y1, x2, y2 = map(round, box.tolist())
             overlay = Image.new("RGBA", result_vis.size, (0, 0, 0, 0))
             trans_draw = ImageDraw.Draw(overlay)
             if self.show_id:
@@ -441,6 +450,9 @@ class AVAVisualizer(object):
                     trans_draw.text(text_pos, caption, fill=(255, 255, 255, self.category_trans),
                                     font=self.font, align="center")
 
+                # Logging Personal Data
+                self.personal_logger.add_person((id, caption, x1, y1, x2, y2))
+
             result_vis = Image.alpha_composite(result_vis, overlay)
 
         return result_vis
@@ -449,66 +461,6 @@ class AVAVisualizer(object):
         img = Image.fromarray(frame[..., ::-1])
         img = img.convert("RGBA")
         img = Image.alpha_composite(img, visual_mask)
-
-        img = img.convert("RGB")
-
-        return np.array(img)[..., ::-1]
-
-    def visual_frame_old(self, frame, result):
-        bboxes = result.bbox
-        scores = result.get_field("scores")
-        img = Image.fromarray(frame[..., ::-1])
-        img = img.convert("RGBA")
-
-        draw = ImageDraw.Draw(img)
-        for box in bboxes:
-            draw.rectangle(box.tolist(), outline=self.box_color + (255,), width=self.box_width)
-
-        for box, score in zip(bboxes, scores):
-            show_idx = torch.nonzero(score >= self.confidence_threshold, as_tuple=False).squeeze(1)
-            captions = []
-            bg_colors = []
-            for category_id in show_idx:
-                if category_id in self.exclude_id:
-                    continue
-                label = self.cate_to_show[category_id]
-                conf = " %.2f" % score[category_id]
-                caption = label + conf
-                captions.append(caption)
-                if category_id <= self.category_split[0]:
-                    bg_colors.append(0)
-                elif category_id <= self.category_split[1]:
-                    bg_colors.append(1)
-                else:
-                    bg_colors.append(2)
-
-            x1, y1, x2, y2 = box.tolist()
-            overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-            trans_draw = ImageDraw.Draw(overlay)
-            caption_sizes = [trans_draw.textsize(caption, font=self.font) for caption in captions]
-            caption_widths, caption_heights = list(zip(*caption_sizes))
-            max_height = max(caption_heights)
-            rec_height = int(round(1.8 * max_height))
-            space_height = int(round(0.2 * max_height))
-            total_height = (rec_height + space_height) * (len(captions) - 1) + rec_height
-            width_pad = max(self.font_size // 2, 1)
-            start_y = max(round(y1) - total_height, space_height)
-
-            for i, caption in enumerate(captions):
-                r_x1 = round(x1)
-                r_y1 = start_y + (rec_height + space_height) * i
-                r_x2 = r_x1 + caption_widths[i] + width_pad * 2
-                r_y2 = r_y1 + rec_height
-                rec_pos = (r_x1, r_y1, r_x2, r_y2)
-
-                height_pad = round((rec_height - caption_heights[i]) / 2)
-                text_pos = (r_x1 + width_pad, r_y1 + height_pad)
-
-                trans_draw.rectangle(rec_pos, fill=self.category_colors[bg_colors[i]] + (self.category_trans,))
-                trans_draw.text(text_pos, caption, fill=(255, 255, 255, self.category_trans), font=self.font,
-                                align="center")
-
-            img = Image.alpha_composite(img, overlay)
 
         img = img.convert("RGB")
 

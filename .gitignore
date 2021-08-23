@@ -32,3 +32,4 @@ datasets
 models
 data
 detector/nms/src/soft_nms_cpu.cpp
+logs
