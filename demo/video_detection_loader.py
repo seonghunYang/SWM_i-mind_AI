@@ -271,7 +271,7 @@ class VideoDetectionLoader(object):
                 # if the `grabbed` boolean is `False`, then we have
                 # reached the end of the video file
                 if not grabbed:
-                    self.wait_and_put(self.track_queue, (None, None, None, None, None))
+                    self.wait_and_put(self.track_queue, (None, None, None, None))
                     self.wait_and_put(self.action_queue, ("Done", self.videoinfo["frameSize"]))
                     #self.wait_till_empty(self.action_queue)
                     #self.wait_till_empty(self.track_queue)
