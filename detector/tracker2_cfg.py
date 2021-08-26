@@ -2,7 +2,8 @@ from easydict import EasyDict as edict
 
 cfg = edict()
 cfg.CONFIG = '../detector/Yolov5_DeepSort_Pytorch/deep_sort_pytorch/configs/deep_sort.yaml'
-cfg.YOLO_WEIGHTS = '../detector/Yolov5_DeepSort_Pytorch/yolov5/weights/crowdhuman_yolov5m.pt'
+# cfg.YOLO_WEIGHTS = '../detector/Yolov5_DeepSort_Pytorch/yolov5/weights/crowdhuman_yolov5m.pt'
+cfg.YOLO_WEIGHTS = '../detector/Yolov5_DeepSort_Pytorch/yolov5/weights/yolov5s.pt'
 cfg.DEEP_WEIGHTS = '../detector/Yolov5_DeepSort_Pytorch/deep_sort_pytorch/deep_sort/deep/checkpoint/ckpt.t7'
 cfg.IMG_SIZE =  640
 cfg.iou_thres =  0.5
