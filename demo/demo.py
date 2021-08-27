@@ -223,9 +223,9 @@ def main():
         final_fuse_id = dict()
 
         print('Total IDs = ', len(images_by_id))
-        reid_start = time.time()
 
         feats = 0
+        extract_reid_features_start = time.time()
         for id, images in images_by_id.items():
             try:
                 # feats[id] -> 2차원 배열
@@ -239,8 +239,25 @@ def main():
 
             except ValueError:
                 pass
+        print(f"extract reid features took {round(time.time()-extract_reid_features_start, 3)} seconds")    
 
+        ann_reverse_start = time.time()
+        ann_id_by_idx = dict()
+        for id, idxs in ann_idxs_by_id.items():
+            for idx in idxs:
+                ann_id_by_idx[idx] = id
+        print(f"Annoy reverse dictionary took {round(time.time()-ann_reverse_start, 3)} seconds")    
 
+        ann_tree_build_start = time.time()
+        nums_ann_idxs = []
+        for id, ann_idxs in ann_idxs_by_id.items():
+            nums_ann_idxs.append(len(ann_idxs))
+
+        ann_tree_size = min(nums_ann_idxs)
+        ann.build(ann_tree_size)
+        print(f"Annoy tree build took {round(time.time()-ann_tree_build_start, 3)} seconds")
+
+        reid_start = time.time()
         for f in ids_per_frame:
             if f:
                 if len(exist_ids) == 0:
@@ -269,11 +286,25 @@ def main():
                                 for ann_idx_by_nid in ann_idxs_by_id[nid]:
                                     for ann_idx_by_oid in ann_idxs_by_id[oid]:
                                         tmp.append(ann.get_distance(ann_idx_by_nid, ann_idx_by_oid))
+
+                                # ann_first_idx = ann_idxs_by_id[nid][0]
+                                # nns = ann.get_nns_by_item(ann_first_idx, len(ann_idxs_by_id[nid])+5)
+                                # for nn in nns[:-5]:
+                                #     if ann_id_by_idx[nn] != nid:
+                                #         tmp.append(ann.get_distance(ann_first_idx, nn))
+                                #         break
+
+                                
                                 # print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
                                 tmp = np.min(tmp)
                                 dis.append([oid, tmp])
+                                # if not tmp:
+                                #     dis.append([oid, tmp[0]])
+                                #     print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp[0]))
+
                             except KeyError:
                                 pass
+
                         exist_ids.add(nid)
                         # print("type(nid) = {}".format(type(nid)))
                         # print("nid = {}".format(nid))
