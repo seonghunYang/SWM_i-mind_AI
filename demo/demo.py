@@ -165,7 +165,7 @@ def main():
     ava_predictor_worker = AVAPredictorWorker(args)
     pred_done_flag = False
 
-    # images_by_id = dict()
+    images_by_id = dict()
     ids_per_frame = []
     ann = AnnoyIndex(2048, 'euclidean')
     ann_idxs_by_id = dict()
@@ -191,9 +191,12 @@ def main():
                     try:
                         ids_per_frame.append(set(map(int, ids)))
                         for bbox, id in zip(boxes, map(int, ids)):
-                            feat = reid._features(orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
-                            print(f"\nfeat.size(): {feat.size()}\n")
-                            ann.add_item(ann_idx, feat)
+                            if id not in images_by_id:
+                                images_by_id[id] = [orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]]
+                            else:
+                                images_by_id[id].append(orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
+                            # print(f"\nfeat.size(): {feat.size()}\n")
+
                             # reid._features().size() -> torch.Size([3])
                             if id not in ann_idxs_by_id:
                                 ann_idxs_by_id[id] = [id]
@@ -219,8 +222,24 @@ def main():
         exist_ids = set()
         final_fuse_id = dict()
 
-        print('Total IDs = ', len(ann_idxs_by_id))
+        print('Total IDs = ', len(images_by_id))
         reid_start = time.time()
+
+        feats = 0
+        for id, images in images_by_id.items():
+            try:
+                # feats[id] -> 2차원 배열
+                feats = reid._features(images)
+                # print(f"feats[i].size(): {feats[i].size()}") -> (frame_num, 2048)
+                ann_idxs_by_id[id] = []
+                for feat in feats:
+                    ann.add_item(ann_idx, feat)
+                    ann_idxs_by_id[id].append(ann_idx)
+                    ann_idx += 1
+
+            except ValueError:
+                pass
+
 
         for f in ids_per_frame:
             if f:
