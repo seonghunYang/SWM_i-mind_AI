@@ -165,9 +165,11 @@ def main():
     ava_predictor_worker = AVAPredictorWorker(args)
     pred_done_flag = False
 
-    track_cnt = dict()
-    images_by_id = dict()
+    # images_by_id = dict()
     ids_per_frame = []
+    ann = AnnoyIndex(2048, 'euclidean')
+    ann_idxs_by_id = dict()
+    ann_idx = 0
     
     print("Showing tracking progress bar (in fps). Other processes are running in the background.")
     try:
@@ -189,10 +191,14 @@ def main():
                     try:
                         ids_per_frame.append(set(map(int, ids)))
                         for bbox, id in zip(boxes, map(int, ids)):
-                            if id not in images_by_id:
-                                images_by_id[id] = [orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]]
+                            feat = reid._features(orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
+                            print(f"\nfeat.size(): {feat.size()}\n")
+                            ann.add_item(ann_idx, feat)
+                            # reid._features().size() -> torch.Size([3])
+                            if id not in ann_idxs_by_id:
+                                ann_idxs_by_id[id] = [id]
                             else:
-                                images_by_id[id].append(orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
+                                ann_idxs_by_id[id].append(id)
 
                     except TypeError:
                         pass
@@ -213,24 +219,8 @@ def main():
         exist_ids = set()
         final_fuse_id = dict()
 
-        print('Total IDs = ',len(images_by_id))
-        feats = dict()
+        print('Total IDs = ', len(ann_idxs_by_id))
         reid_start = time.time()
-        ann_idx = 0
-        annoy_index = AnnoyIndex(2048, 'euclidean')
-
-        for i in images_by_id:
-            try:
-                # feats[id] -> 2차원 배열
-                feats[i] = reid._features(images_by_id[i])
-                # print(f"feats[i].size(): {feats[i].size()}") -> (frame_num, 2048)
-                
-                # for feat_idx in range(feats[i].size(0)):
-                #     annoy_index.add_item(ann_idx, feats[feat_idx])
-                #     ann_idx += 1
-
-            except ValueError:
-                pass
 
         for f in ids_per_frame:
             if f:
@@ -243,20 +233,25 @@ def main():
                     new_ids = f-exist_ids
                     for nid in new_ids:
                         dis = []
-                        if len(images_by_id[nid]) < 10:
+                        if len(ann_idxs_by_id[nid]) < 10:
                             exist_ids.add(nid)
                             continue
+
                         unpickable = []
                         for i in f: # f = ids
-                            for key,item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
+                            for key, item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
                                 if i in item:
                                     unpickable += final_fuse_id[key]
                         print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
                         for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
                             try:
                                 # tmp = np.mean(reid.compute_distance(feats[nid], feats[oid]))
-                                tmp = np.min(reid.compute_distance(feats[nid], feats[oid]))
+                                tmp = []
+                                for ann_idx_by_nid in ann_idxs_by_id[nid]:
+                                    for ann_idx_by_oid in ann_idxs_by_id[oid]:
+                                        tmp.append(ann.get_distance(ann_idx_by_nid, ann_idx_by_oid))
                                 # print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
+                                tmp = np.min(tmp)
                                 dis.append([oid, tmp])
                             except KeyError:
                                 pass
@@ -269,7 +264,6 @@ def main():
                         dis.sort(key=operator.itemgetter(1))
                         if dis[0][1] < threshold:
                             combined_id = dis[0][0]
-                            images_by_id[combined_id] += images_by_id[nid]
                             final_fuse_id[combined_id].append(nid)
                         else:
                             final_fuse_id[nid] = [nid]
@@ -281,6 +275,7 @@ def main():
                 final_fuse_id_reverse[sub_id] = final_id
         # for passing 'final_fuse_id_reverse' to video_writer
         fuse_queue.put(final_fuse_id_reverse)
+
         print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
         
 
