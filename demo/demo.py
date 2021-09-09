@@ -25,6 +25,8 @@ from action_predictor import AVAPredictorWorker
 import resource
 from annoy import AnnoyIndex
 import time
+from torchreid.data.transforms import build_transforms
+from PIL import Image
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
@@ -165,11 +167,10 @@ def main():
     ava_predictor_worker = AVAPredictorWorker(args)
     pred_done_flag = False
 
-    images_by_id = dict()
+    box_imgs_by_id = dict()
+    id_with_box_imgs = []
     ids_per_frame = []
     ann = AnnoyIndex(2048, 'euclidean')
-    ann_idxs_by_id = dict()
-    ann_idx = 0
     
     print("Showing tracking progress bar (in fps). Other processes are running in the background.")
     try:
@@ -190,18 +191,16 @@ def main():
                 else:
                     try:
                         ids_per_frame.append(set(map(int, ids)))
-                        for bbox, id in zip(boxes, map(int, ids)):
-                            if id not in images_by_id:
-                                images_by_id[id] = [orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]]
-                            else:
-                                images_by_id[id].append(orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])])
-                            # print(f"\nfeat.size(): {feat.size()}\n")
 
-                            # reid._features().size() -> torch.Size([3])
-                            if id not in ann_idxs_by_id:
-                                ann_idxs_by_id[id] = [id]
+                        for bbox, id in zip(boxes, map(int, ids)):
+                            box_img = orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
+
+                            if id not in box_imgs_by_id:
+                                box_imgs_by_id[id] = [box_img]
                             else:
-                                ann_idxs_by_id[id].append(id)
+                                box_imgs_by_id[id].append(box_img)
+                            
+                            # id_with_box_imgs.append((id, box_img))
 
                     except TypeError:
                         pass
@@ -217,35 +216,65 @@ def main():
     except KeyboardInterrupt:
         print("Keyboard Interrupted")
 
+    id_with_box_imgs = []
+    box_imgs = []
+    for id, bimgs in box_imgs_by_id.items():
+        box_imgs += bimgs
+        for bimg in bimgs:
+            id_with_box_imgs.append((id, bimg))
+
+    print(f"\nlen(box_imgs):{len(box_imgs)}\n")
+
     if not args.realtime:
         threshold = 280
         exist_ids = set()
         final_fuse_id = dict()
-
-        print('Total IDs = ', len(images_by_id))
-
-        feats = 0
+        reid_features = 0
         extract_reid_features_start = time.time()
-        for id, images in images_by_id.items():
-            try:
-                # feats[id] -> 2차원 배열
-                feats = reid._features(images)
-                # print(f"feats[i].size(): {feats[i].size()}") -> (frame_num, 2048)
-                ann_idxs_by_id[id] = []
-                for feat in feats:
-                    ann.add_item(ann_idx, feat)
-                    ann_idxs_by_id[id].append(ann_idx)
-                    ann_idx += 1
 
-            except ValueError:
-                pass
-        print(f"extract reid features took {round(time.time()-extract_reid_features_start, 3)} seconds")    
+        # print(f"\n\nid_with_box_imgs:{id_with_box_imgs}\n")z
+        # box_imgs = [box_img for _, box_img in id_with_box_imgs]
+        id_by_ann_idx = {i: id_with_box_imgs[i][0] for i in range(len(box_imgs))}
+        ann_idxs_by_id = {}
+
+        # 객체 ID에 해당하는 Annoy index(추출한 ReID feature 벡터) 리스트를 맵핑
+        if id_with_box_imgs: # 영상에 사람 객체가 한 번이라도 등장했다면
+            last_id = id_with_box_imgs[0][0] # 마지막으로 등장한 ID. 계속 갱신
+            ann_idxs = [] # 해당 ID에 해당하는 annoy index들을 모으기 위함
+            for ann_idx, (id, box_img) in enumerate(id_with_box_imgs):
+                if id == last_id:
+                    ann_idxs.append(ann_idx)
+
+                else:
+                    ann_idxs_by_id[last_id] = ann_idxs # 모아둔 ann_idxs를 맵핑
+                    last_id = id # 마지막으로 등장한 ID 갱신
+                    ann_idxs = [ann_idx] # ann_idxs 초기화 및 현재 인덱스 추가
+            
+            # 마지막으로 추가
+            ann_idxs_by_id[last_id] = ann_idxs
+        
+        print("\n\nfor id, ann_idxs in ann_idxs_by_id.items():")
+        for id, ann_idxs in ann_idxs_by_id.items():
+            print(f"id: {id}, ann_idxs = {ann_idxs}")
+        print("\n\nend\n")
+
+        # try:
+        # feats[id] -> 2차원 배열
+        reid_features = reid._features(box_imgs)
+        print(f"\nreid_features.size(): {reid_features.size()}\n")
+        # print(f"feats[i].size(): {feats[i].size()}") -> (frame_num, 2048)
+        for i, feat in enumerate(reid_features):
+            ann.add_item(i, feat)
+
+        # except ValueError:
+        #     pass
+        print(f"\nextract reid features took {round(time.time()-extract_reid_features_start, 3)} seconds")    
 
         ann_reverse_start = time.time()
-        ann_id_by_idx = dict()
-        for id, idxs in ann_idxs_by_id.items():
-            for idx in idxs:
-                ann_id_by_idx[idx] = id
+        # for id, idxs in ann_idxs_by_id.items():
+        #     for idx in idxs:
+        #         ann_id_by_idx[idx] = id
+        ann_idx_by_id = {ann_idx: id for ann_idx, id in id_by_ann_idx.items()}
         print(f"Annoy reverse dictionary took {round(time.time()-ann_reverse_start, 3)} seconds")    
 
         ann_tree_build_start = time.time()
@@ -279,6 +308,9 @@ def main():
                                 if i in item:
                                     unpickable += final_fuse_id[key]
                         print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
+
+                        # instance_ids,  = ann.get_nns_by_item(nid, 2, include_distances=True)
+
                         for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
                             try:
                                 # tmp = np.mean(reid.compute_distance(feats[nid], feats[oid]))
