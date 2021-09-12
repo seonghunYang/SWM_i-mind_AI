@@ -43,43 +43,41 @@ class REID:
     def _features(self, imgs):
         f = []
         total_num = len(imgs) # 특징점을 추출하고자 하는 이미지 총 개수
-        batch_size = 25 # batch size. 메모리 용량에 맞게 조정 가능
+        batch_size = 10 # batch size. 메모리 용량에 맞게 조정 가능
         loop_num = total_num//batch_size
 
         for l in range(loop_num):
             start = l*batch_size
             end = start+batch_size
+            batch_imgs = []
             features = []
             for i in range(start, end):
                 imgs[i] = Image.fromarray(imgs[i].astype('uint8')).convert('RGB')
                 imgs[i] = self.transform_te(imgs[i])
                 imgs[i] = torch.unsqueeze(imgs[i], 0)
-                imgs[i] = imgs[i].cuda()
-                # feature = self._extract_features(imgs[i]) # (1 x 2048)
-                # features.append(feature)
-            ft_imgs = torch.cat(imgs[start:end], 0)
-            print(f"\nft_imgs.size() -> {ft_imgs.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
+                batch_imgs.append(imgs[i].cuda())
+            ft_imgs = torch.cat(batch_imgs, 0)
+            # print(f"\nft_imgs.size() -> {ft_imgs.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
             features = self._extract_features(ft_imgs)
-            print(f"\features.size() -> {features.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
-            # features = torch.cat(features, 0) # (batch_size x 1 x 2048)
+            del ft_imgs
+            torch.cuda.empty_cache()
             features = features.data.cpu()
             f.append(features)
         
         # Process last loop
         start = loop_num*batch_size
+        batch_imgs = []
         features = []
         for i in range(start, total_num):
             imgs[i] = Image.fromarray(imgs[i].astype('uint8')).convert('RGB')
             imgs[i] = self.transform_te(imgs[i])
             imgs[i] = torch.unsqueeze(imgs[i], 0)
-            imgs[i] = imgs[i].cuda()
-            # feature = self._extract_features(imgs[i]) # (1 x 2048)
-            # features.append(feature)
-        ft_imgs = torch.cat(imgs[start:total_num], 0)
+            batch_imgs.append(imgs[i].cuda())
+        ft_imgs = torch.cat(batch_imgs, 0)
         print(f"\nft_imgs.size() -> {ft_imgs.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
         features = self._extract_features(ft_imgs)
-        print(f"\features.size() -> {features.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
-        # features = torch.cat(features, 0) # (batch_size x 1 x 2048)
+        del ft_imgs
+        torch.cuda.empty_cache()
         features = features.data.cpu()
         f.append(features)
 
