@@ -168,6 +168,7 @@ class VideoDetectionLoader(object):
 
             # Process detections
             img_det = None
+            orig_img = im0s[:, :, ::-1]
 
             for i, det in enumerate(pred):  # detections per image
                 if self.detector.webcam:  # batch_size >= 1
@@ -195,7 +196,6 @@ class VideoDetectionLoader(object):
                     # pass detections to deepsort
                     outputs = self.detector.deepsort.update(xywhs.cpu(), confs.cpu(), clss, im0)
 
-                    orig_img = im0s[:, :, ::-1]
                     bboxes = []
                     scores = []
                     ids = []
