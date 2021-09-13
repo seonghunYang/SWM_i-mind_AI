@@ -6,6 +6,9 @@ import torch
 import os
 from torchreid import metrics
 from timeit import time
+from annoy import AnnoyIndex
+
+
 class REID:
     def __init__(self):
         self.model = torchreid.models.build_model(

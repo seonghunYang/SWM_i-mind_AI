@@ -199,8 +199,6 @@ def main():
                                 box_imgs_by_id[id] = [box_img]
                             else:
                                 box_imgs_by_id[id].append(box_img)
-                            
-                            # id_with_box_imgs.append((id, box_img))
 
                     except TypeError:
                         pass
@@ -223,18 +221,18 @@ def main():
         for bimg in bimgs:
             id_with_box_imgs.append((id, bimg))
 
+    del box_imgs_by_id
+
     print(f"\nlen(box_imgs):{len(box_imgs)}\n")
 
     if not args.realtime:
         threshold = 280
         exist_ids = set()
         final_fuse_id = dict()
+        
         reid_features = 0
         extract_reid_features_start = time.time()
 
-        # print(f"\n\nid_with_box_imgs:{id_with_box_imgs}\n")z
-        # box_imgs = [box_img for _, box_img in id_with_box_imgs]
-        id_by_ann_idx = {i: id_with_box_imgs[i][0] for i in range(len(box_imgs))}
         ann_idxs_by_id = {}
 
         # 객체 ID에 해당하는 Annoy index(추출한 ReID feature 벡터) 리스트를 맵핑
@@ -252,30 +250,14 @@ def main():
             
             # 마지막으로 추가
             ann_idxs_by_id[last_id] = ann_idxs
-        
-        print("\n\nfor id, ann_idxs in ann_idxs_by_id.items():")
-        for id, ann_idxs in ann_idxs_by_id.items():
-            print(f"id: {id}, ann_idxs = {ann_idxs}")
-        print("\n\nend\n")
 
-        # try:
-        # feats[id] -> 2차원 배열
         reid_features = reid._features(box_imgs)
         print(f"\nreid_features.size(): {reid_features.size()}\n")
-        # print(f"feats[i].size(): {feats[i].size()}") -> (frame_num, 2048)
+
         for i, feat in enumerate(reid_features):
             ann.add_item(i, feat)
 
-        # except ValueError:
-        #     pass
         print(f"\nextract reid features took {round(time.time()-extract_reid_features_start, 3)} seconds")    
-
-        ann_reverse_start = time.time()
-        # for id, idxs in ann_idxs_by_id.items():
-        #     for idx in idxs:
-        #         ann_id_by_idx[idx] = id
-        ann_idx_by_id = {ann_idx: id for ann_idx, id in id_by_ann_idx.items()}
-        print(f"Annoy reverse dictionary took {round(time.time()-ann_reverse_start, 3)} seconds")    
 
         ann_tree_build_start = time.time()
         nums_ann_idxs = []
@@ -309,41 +291,28 @@ def main():
                                     unpickable += final_fuse_id[key]
                         print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
 
-                        # instance_ids,  = ann.get_nns_by_item(nid, 2, include_distances=True)
-
                         for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
                             try:
-                                # tmp = np.mean(reid.compute_distance(feats[nid], feats[oid]))
                                 tmp = []
                                 for ann_idx_by_nid in ann_idxs_by_id[nid]:
                                     for ann_idx_by_oid in ann_idxs_by_id[oid]:
                                         tmp.append(ann.get_distance(ann_idx_by_nid, ann_idx_by_oid))
-
-                                # ann_first_idx = ann_idxs_by_id[nid][0]
-                                # nns = ann.get_nns_by_item(ann_first_idx, len(ann_idxs_by_id[nid])+5)
-                                # for nn in nns[:-5]:
-                                #     if ann_id_by_idx[nn] != nid:
-                                #         tmp.append(ann.get_distance(ann_first_idx, nn))
-                                #         break
-
                                 
                                 # print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
                                 tmp = np.min(tmp)
                                 dis.append([oid, tmp])
-                                # if not tmp:
-                                #     dis.append([oid, tmp[0]])
-                                #     print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp[0]))
 
                             except KeyError:
                                 pass
 
                         exist_ids.add(nid)
-                        # print("type(nid) = {}".format(type(nid)))
-                        # print("nid = {}".format(nid))
+
                         if not dis:
                             final_fuse_id[nid] = [nid]
                             continue
+
                         dis.sort(key=operator.itemgetter(1))
+
                         if dis[0][1] < threshold:
                             combined_id = dis[0][0]
                             final_fuse_id[combined_id].append(nid)
@@ -360,7 +329,6 @@ def main():
 
         print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
         
-
         video_writer.send_track("DONE")
         while not pred_done_flag:
             result = ava_predictor_worker.read()
