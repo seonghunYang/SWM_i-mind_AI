@@ -49,8 +49,14 @@ def prep_frame(img, inp_dim):
 
     Returns a Variable
     """
-
+    if len(img.shape) == 4: # ex. (1, 480, 640, 3) it can raise error
+        img = img[0, :, :, :] # need to unsequeeze
     orig_im = img
+    # print("\n -- detector/yolo/preprocess.py --")
+    # print(f"type(img): {type(img)}") -> numpy.ndarray
+    # print(f"type(inp_dim): {type(inp_dim)}") -> int
+    # print(f"img.shape: {img.shape}") -> (height, width, channels). (480, 640, 3)
+    # print(f"inp_dim: {inp_dim}") -> 608?
     dim = orig_im.shape[1], orig_im.shape[0]
     img = (letterbox_image(orig_im, (inp_dim, inp_dim)))
     img_ = img[:, :, ::-1].transpose((2, 0, 1)).copy()

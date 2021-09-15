@@ -10,11 +10,12 @@ import queue
 
 import torch
 import torch.multiprocessing as mp
+import torch.backends.cudnn as cudnn
 from torchvision.transforms import functional as F
 from pathlib import Path
 
 from detector.apis import get_detector
-from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.datasets import LoadImages, LoadStreams
+from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.datasets import LoadImages, LoadStreams, LoadWebcam
 from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.general import non_max_suppression, scale_coords, xyxy2xywh
 from detector.Yolov5_DeepSort_Pytorch.yolov5.utils.torch_utils import time_synchronized
 
@@ -138,16 +139,22 @@ class VideoDetectionLoader(object):
                     sleep(0.1)
 
     def yolo5_track(self):
-        dataset = LoadImages(self.input_path, img_size=self.detector.imgsz)
+        if self.realtime:
+            cudnn.benchmark = True
+            dataset = LoadStreams(str(self.input_path), img_size=self.detector.imgsz, stride=self.detector.stride)
+        else:
+            dataset = LoadImages(self.input_path, img_size=self.detector.imgsz)
 
         cur_millis = 0
 
         for frame_idx, (path, img, im0s, stream) in enumerate(dataset):
+            im0s = np.array(im0s)
+            orig_img = im0s
 
             last_millis = cur_millis
             cur_millis = stream.get(cv2.CAP_PROP_POS_MSEC)
 
-            if not self.realtime and self.duration_mill != -1 and cur_millis > self.start_mill + self.duration_mill:
+            if self.duration_mill != -1 and cur_millis > self.start_mill + self.duration_mill:
                 break
 
             img = torch.from_numpy(img).to(self.detector.device)
@@ -168,10 +175,10 @@ class VideoDetectionLoader(object):
 
             # Process detections
             img_det = None
-            orig_img = im0s[:, :, ::-1]
+            # orig_img = im0s[:, :, ::-1]
 
             for i, det in enumerate(pred):  # detections per image
-                if self.detector.webcam:  # batch_size >= 1
+                if self.realtime:  # batch_size >= 1
                     p, s, im0 = path[i], '%g: ' % i, im0s[i].copy()
                 else:
                     p, s, im0 = path, '', im0s
@@ -206,10 +213,12 @@ class VideoDetectionLoader(object):
                             scores.append(conf)
                             ids.append(output[4])
 
+                    # img_det = (im0s[:, :, ::-1], bboxes, scores, ids)
                     img_det = (orig_img, bboxes, scores, ids)
                         
                 else:
                     self.detector.deepsort.increment_ages()
+                    # img_det = (im0s[:, :, ::-1], None, None, None)
                     img_det = (orig_img, None, None, None)
 
                 self.image_postprocess(img_det, (im0s, cur_millis))

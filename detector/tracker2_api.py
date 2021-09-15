@@ -65,8 +65,8 @@ class Tracker(BaseDetector):
         # Load model
     def load_model(self):
         self.model = attempt_load(self.yolo_weights, map_location=self.opt.device)  # load FP32 model
-        stride = int(self.model.stride.max())  # model stride
-        imgsz = check_img_size(self.imgsz, s=stride)  # check img_size
+        self.stride = int(self.model.stride.max())  # model stride
+        imgsz = check_img_size(self.imgsz, s=self.stride)  # check img_size
         self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names  # get class names
         if self.half:
             self.model.half()  # to FP16

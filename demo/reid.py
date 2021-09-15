@@ -77,7 +77,7 @@ class REID:
             imgs[i] = torch.unsqueeze(imgs[i], 0)
             batch_imgs.append(imgs[i].cuda())
         ft_imgs = torch.cat(batch_imgs, 0)
-        print(f"\nft_imgs.size() -> {ft_imgs.size()}") # (batch_size x 3 x width x height), width, height는 uint8?
+        # print(f"\nft_imgs.size() -> {ft_imgs.size()}") # (batch_size_remains x 3 x width x height), width, height는 uint8?
         features = self._extract_features(ft_imgs)
         del ft_imgs
         torch.cuda.empty_cache()

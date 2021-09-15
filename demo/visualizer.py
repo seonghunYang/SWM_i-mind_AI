@@ -159,6 +159,7 @@ class AVAVisualizer(object):
             exclude_class=None,
             common_cate=False,
             show_id=False,
+            detector='tracker2'
     ):
         self.vid_info = cv2_video_info(video_path)
         fps = self.vid_info["fps"]
@@ -173,6 +174,7 @@ class AVAVisualizer(object):
         self.show_time =  show_time
         self.confidence_threshold = confidence_threshold
         self.show_id = show_id
+        self.detector = detector
         self.fuse_queue = fuse_queue
         if common_cate:
             self.cate_to_show = self.COMMON_CATES
@@ -196,8 +198,8 @@ class AVAVisualizer(object):
         self.category_colors = ((176, 85, 234), (87, 118, 198), (52, 189, 199))
         self.category_trans = int(0.6 * 255)
 
-        self.action_dictionary = dict()
-        self.personal_logger = PersonalLogger('./logs')
+        self.action_dictionary = {}
+        self.personal_logger = PersonalLogger('../logs')
         self.frame_num = 0
 
         if realtime:
@@ -218,7 +220,8 @@ class AVAVisualizer(object):
             self.video_writer.start()
 
     def realtime_write_frame(self, result, orig_img, boxes, scores, ids):
-        orig_img = orig_img[:, :, ::-1]
+        if self.detector == 'tracker':
+            orig_img = orig_img[:, :, ::-1]
 
         if result is not None:
             result, timestamp, result_ids = result
@@ -229,7 +232,8 @@ class AVAVisualizer(object):
                 self.update_action_dictionary(update_scores, update_ids)
 
         if boxes is not None:
-            last_visual_mask = self.visual_result(boxes, ids)
+            final_fuse_id_reverse = {}
+            last_visual_mask = self.visual_result(boxes, ids, final_fuse_id_reverse)
             orig_img = self.visual_frame(orig_img, last_visual_mask)
 
         cv2.imshow("my webcam", orig_img)
@@ -315,7 +319,7 @@ class AVAVisualizer(object):
                 last_visual_mask = self.visual_result(boxes, ids, final_fuse_id_reverse)
 
                 # Logging
-                if self.personal_logger.persons:
+                if self.personal_logger.activities:
                     self.personal_logger.log(self.frame_num)
 
                 new_frame = self.visual_frame(frame, last_visual_mask)

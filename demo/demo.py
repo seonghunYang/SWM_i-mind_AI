@@ -123,6 +123,12 @@ def main():
         help="The nms threshold for tracker",
         type=float,
     )
+    parser.add_argument(
+        "--reid",
+        default=False,
+        help="do re-identification",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -158,7 +164,8 @@ def main():
         (not args.hide_time),
         confidence_threshold = args.visual_threshold,
         common_cate = args.common_cate,
-        show_id = args.show_id
+        show_id = args.show_id,
+        detector = args.detector
     )
 
     torch.multiprocessing.set_start_method('forkserver', force=True)
@@ -184,6 +191,8 @@ def main():
                     break
 
                 if args.realtime:
+                    if args.detector == "tracker2":
+                        orig_img = np.array(orig_img[0, :, :, :])
                     result = ava_predictor_worker.read()
                     flag = video_writer.realtime_write_frame(result, orig_img, boxes, scores, ids)
                     if not flag:
@@ -202,6 +211,7 @@ def main():
 
                     except TypeError:
                         pass
+                    
                     video_writer.send_track((boxes, ids))
                     while not pred_done_flag:
                         result = ava_predictor_worker.read()
@@ -211,6 +221,7 @@ def main():
                             pred_done_flag = True
                         else:
                             video_writer.send(result)
+
     except KeyboardInterrupt:
         print("Keyboard Interrupted")
 
@@ -222,8 +233,6 @@ def main():
             id_with_box_imgs.append((id, bimg))
 
     del box_imgs_by_id
-
-    print(f"\nlen(box_imgs):{len(box_imgs)}\n")
 
     if not args.realtime:
         threshold = 280
@@ -320,14 +329,17 @@ def main():
                             final_fuse_id[nid] = [nid]
 
         print('Final ids and their sub-ids:', final_fuse_id)
+        
         final_fuse_id_reverse = dict()
+        
         for final_id, sub_ids in final_fuse_id.items():
             for sub_id in sub_ids:
                 final_fuse_id_reverse[sub_id] = final_id
         # for passing 'final_fuse_id_reverse' to video_writer
+        
         fuse_queue.put(final_fuse_id_reverse)
 
-        print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
+        # print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
         
         video_writer.send_track("DONE")
         while not pred_done_flag:

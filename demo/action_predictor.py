@@ -381,7 +381,8 @@ class AVAPredictorWorker(object):
 
             frame, cur_millis, boxes, scores, ids = extra
 
-
+            if len(frame.shape) == 4: # ex. (1, 480, 640, 3) it can raise error
+                frame = frame[0, :, :, :] # need to unsequeeze
             self.frame_stack.append(frame)
             self.extra_stack.append((cur_millis, boxes, scores, ids))
             self.frame_stack = self.frame_stack[-self.frame_buffer_numbers:]
@@ -404,7 +405,12 @@ class AVAPredictorWorker(object):
                     continue
 
                 if self.coco_det is not None:
+                    # print("\n-- self.coco_det is not None: --")
                     kframe = self.frame_stack[self.center_index]
+                    # print(f"type(kframe): {type(kframe)}") -> numpy.ndarray
+                    # print(f"kframe.shape: {kframe.shape}") -> (height, width, #channel). (480, 640, 3)
+                    if len(kframe.shape) == 4:
+                        kframe = kframe[0, :, :, :]
                     center_timestamp = int(center_timestamp)
 
                     kframe_data = self.coco_det.image_preprocess(kframe)
@@ -419,6 +425,8 @@ class AVAPredictorWorker(object):
                 else:
                     obj_boxes = None
 
+                # print(f"\ntype(frame_arr): {type(frame_arr)}") -> numpy.ndarray
+                # print(f"frame_arr.shape: {frame_arr.shape}") -> (#stacked, height, width, #channel). (64, 480, 640, 3)
                 video_data, _, transform_randoms = self.vid_transforms(frame_arr, None)
 
                 person_box = BoxList(person_boxes, video_size, "xyxy").clip_to_image()
@@ -433,8 +441,10 @@ class AVAPredictorWorker(object):
 
                 if self.realtime:
                     predictions = self.ava_predictor.compute_prediction(feature_index, video_size)
-                    #print(len(predictions.get_field("scores")), person_ids)
-                    self.output_queue.put((predictions, center_timestamp, person_ids[:, 0]))
+                    if isinstance(person_ids, list):
+                        self.output_queue.put((predictions, center_timestamp, person_ids))
+                    else: # Torch Tensor
+                        self.output_queue.put((predictions, center_timestamp, person_ids[:, 0]))
                     self.ava_predictor.clear_feature(feature_index)
                     pred_num_cnt += 1
                 else:
