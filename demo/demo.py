@@ -174,10 +174,13 @@ def main():
     ava_predictor_worker = AVAPredictorWorker(args)
     pred_done_flag = False
 
-    box_imgs_by_id = dict()
+    box_imgs_by_id = {}
     id_with_box_imgs = []
     ids_per_frame = []
     ann = AnnoyIndex(2048, 'euclidean')
+    ann_idxs_by_id = {}
+    reid_features = []
+    ann_idx = 0
     
     print("Showing tracking progress bar (in fps). Other processes are running in the background.")
     try:
@@ -198,20 +201,33 @@ def main():
                     if not flag:
                         break
                 else:
-                    try:
-                        ids_per_frame.append(set(map(int, ids)))
+                    if args.reid:
+                        try:
+                            ids_per_frame.append(set(map(int, ids)))
 
-                        for bbox, id in zip(boxes, map(int, ids)):
-                            box_img = orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
+                            for bbox, id in zip(boxes, map(int, ids)):
+                                box_img = orig_img[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
+                                
+                                if id not in box_imgs_by_id:
+                                    box_imgs_by_id[id] = [box_img]
+                                    ann_idxs_by_id[id] = []
+                                else:
+                                    box_imgs_by_id[id].append(box_img)
 
-                            if id not in box_imgs_by_id:
-                                box_imgs_by_id[id] = [box_img]
-                            else:
-                                box_imgs_by_id[id].append(box_img)
+                                    if len(box_imgs_by_id[id]) == 10:
+                                        reid_features = reid._features_opt(box_imgs_by_id[id])
+                                        # reid_features.size() -> torch.Size([10, 2048])
 
-                    except TypeError:
-                        pass
-                    
+                                        for feat in reid_features:
+                                            ann.add_item(ann_idx, feat)
+                                            ann_idxs_by_id[id].append(ann_idx)
+                                            ann_idx += 1
+
+                                        box_imgs_by_id[id] = []
+                                
+                        except TypeError:
+                            pass
+
                     video_writer.send_track((boxes, ids))
                     while not pred_done_flag:
                         result = ava_predictor_worker.read()
@@ -221,125 +237,96 @@ def main():
                             pred_done_flag = True
                         else:
                             video_writer.send(result)
+        
+        for id, box_imgs in box_imgs_by_id.items():
+            if box_imgs:
+                reid_features = reid._features_opt(box_imgs_by_id[id])
 
+                for feat in reid_features:
+                    ann.add_item(ann_idx, feat)
+                    ann_idxs_by_id[id].append(ann_idx)
+                    ann_idx += 1
+        
+        box_imgs_by_id = {}
+            
     except KeyboardInterrupt:
         print("Keyboard Interrupted")
-
-    id_with_box_imgs = []
-    box_imgs = []
-    for id, bimgs in box_imgs_by_id.items():
-        box_imgs += bimgs
-        for bimg in bimgs:
-            id_with_box_imgs.append((id, bimg))
-
-    del box_imgs_by_id
 
     if not args.realtime:
         threshold = 280
         exist_ids = set()
         final_fuse_id = dict()
-        
-        reid_features = 0
-        extract_reid_features_start = time.time()
+        if args.reid:
+            ann_tree_build_start = time.time()
+            ann_tree_size = 5
+            ann.build(ann_tree_size)
+            print(f"Annoy tree build took {round(time.time()-ann_tree_build_start, 3)} seconds")
 
-        ann_idxs_by_id = {}
+            reid_start = time.time()
+            for f in ids_per_frame:
+                if f:
+                    if len(exist_ids) == 0:
+                        for i in f:
+                            final_fuse_id[i] = [i]
 
-        # 객체 ID에 해당하는 Annoy index(추출한 ReID feature 벡터) 리스트를 맵핑
-        if id_with_box_imgs: # 영상에 사람 객체가 한 번이라도 등장했다면
-            last_id = id_with_box_imgs[0][0] # 마지막으로 등장한 ID. 계속 갱신
-            ann_idxs = [] # 해당 ID에 해당하는 annoy index들을 모으기 위함
-            for ann_idx, (id, box_img) in enumerate(id_with_box_imgs):
-                if id == last_id:
-                    ann_idxs.append(ann_idx)
+                        exist_ids = exist_ids or f
+                    else:
+                        new_ids = f-exist_ids
+                        for nid in new_ids:
+                            dis = []
+                            if len(ann_idxs_by_id[nid]) < 10:
+                                exist_ids.add(nid)
+                                continue
 
-                else:
-                    ann_idxs_by_id[last_id] = ann_idxs # 모아둔 ann_idxs를 맵핑
-                    last_id = id # 마지막으로 등장한 ID 갱신
-                    ann_idxs = [ann_idx] # ann_idxs 초기화 및 현재 인덱스 추가
-            
-            # 마지막으로 추가
-            ann_idxs_by_id[last_id] = ann_idxs
+                            unpickable = []
+                            for i in f: # f = ids
+                                for key, item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
+                                    if i in item:
+                                        unpickable += final_fuse_id[key]
+                            print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
 
-        reid_features = reid._features(box_imgs)
-        print(f"\nreid_features.size(): {reid_features.size()}\n")
+                            for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
+                                try:
+                                    tmp = []
+                                    for ann_idx_by_nid in ann_idxs_by_id[nid]:
+                                        for ann_idx_by_oid in ann_idxs_by_id[oid]:
+                                            tmp.append(ann.get_distance(ann_idx_by_nid, ann_idx_by_oid))
+                                    
+                                    # print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
+                                    tmp = np.min(tmp)
+                                    dis.append([oid, tmp])
 
-        for i, feat in enumerate(reid_features):
-            ann.add_item(i, feat)
+                                except KeyError:
+                                    pass
 
-        print(f"\nextract reid features took {round(time.time()-extract_reid_features_start, 3)} seconds")    
-
-        ann_tree_build_start = time.time()
-        nums_ann_idxs = []
-        for id, ann_idxs in ann_idxs_by_id.items():
-            nums_ann_idxs.append(len(ann_idxs))
-
-        ann_tree_size = min(nums_ann_idxs)
-        ann.build(ann_tree_size)
-        print(f"Annoy tree build took {round(time.time()-ann_tree_build_start, 3)} seconds")
-
-        reid_start = time.time()
-        for f in ids_per_frame:
-            if f:
-                if len(exist_ids) == 0:
-                    for i in f:
-                        final_fuse_id[i] = [i]
-
-                    exist_ids = exist_ids or f
-                else:
-                    new_ids = f-exist_ids
-                    for nid in new_ids:
-                        dis = []
-                        if len(ann_idxs_by_id[nid]) < 10:
                             exist_ids.add(nid)
-                            continue
 
-                        unpickable = []
-                        for i in f: # f = ids
-                            for key, item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
-                                if i in item:
-                                    unpickable += final_fuse_id[key]
-                        print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
+                            if not dis:
+                                final_fuse_id[nid] = [nid]
+                                continue
 
-                        for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
-                            try:
-                                tmp = []
-                                for ann_idx_by_nid in ann_idxs_by_id[nid]:
-                                    for ann_idx_by_oid in ann_idxs_by_id[oid]:
-                                        tmp.append(ann.get_distance(ann_idx_by_nid, ann_idx_by_oid))
-                                
-                                # print('nid {}, oid {}, tmp {}'.format(nid, oid, tmp))
-                                tmp = np.min(tmp)
-                                dis.append([oid, tmp])
+                            dis.sort(key=operator.itemgetter(1))
 
-                            except KeyError:
-                                pass
+                            if dis[0][1] < threshold:
+                                combined_id = dis[0][0]
+                                ann_idxs_by_id[combined_id] += ann_idxs_by_id[nid]
+                                del ann_idxs_by_id[nid]
+                                final_fuse_id[combined_id].append(nid)
+                            else:
+                                final_fuse_id[nid] = [nid]
 
-                        exist_ids.add(nid)
-
-                        if not dis:
-                            final_fuse_id[nid] = [nid]
-                            continue
-
-                        dis.sort(key=operator.itemgetter(1))
-
-                        if dis[0][1] < threshold:
-                            combined_id = dis[0][0]
-                            final_fuse_id[combined_id].append(nid)
-                        else:
-                            final_fuse_id[nid] = [nid]
-
-        print('Final ids and their sub-ids:', final_fuse_id)
-        
+            print('Final ids and their sub-ids:', final_fuse_id)
+            print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
+            
         final_fuse_id_reverse = dict()
         
-        for final_id, sub_ids in final_fuse_id.items():
-            for sub_id in sub_ids:
-                final_fuse_id_reverse[sub_id] = final_id
-        # for passing 'final_fuse_id_reverse' to video_writer
-        
-        fuse_queue.put(final_fuse_id_reverse)
+        if args.reid:
+            for final_id, sub_ids in final_fuse_id.items():
+                for sub_id in sub_ids:
+                    final_fuse_id_reverse[sub_id] = final_id
 
-        # print(f"Re-ID took {round(time.time()-reid_start, 3)} seconds")
+        # for passing 'final_fuse_id_reverse' to video_writer
+        fuse_queue.put(final_fuse_id_reverse)
         
         video_writer.send_track("DONE")
         while not pred_done_flag:

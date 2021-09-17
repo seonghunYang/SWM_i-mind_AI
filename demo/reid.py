@@ -46,7 +46,7 @@ class REID:
     def _features(self, imgs):
         f = []
         total_num = len(imgs) # 특징점을 추출하고자 하는 이미지 총 개수
-        batch_size = 10 # batch size. 메모리 용량에 맞게 조정 가능
+        batch_size = 20 # batch size. 메모리 용량에 맞게 조정 가능
         loop_num = total_num//batch_size
 
         for l in range(loop_num):
@@ -85,7 +85,20 @@ class REID:
         f.append(features)
 
         f = torch.cat(f, 0)
-        return f # (n x 2048)
+        return f # f.size() -> torch.Size([n, 2048])
+
+    def _features_opt(self, imgs):
+        for i in range(len(imgs)):
+            imgs[i] = Image.fromarray(imgs[i].astype('uint8')).convert('RGB')
+            imgs[i] = self.transform_te(imgs[i])
+            imgs[i] = torch.unsqueeze(imgs[i], 0)
+            imgs[i] = imgs[i].cuda()
+        ft_imgs = torch.cat(imgs, 0)
+        f = self._extract_features(ft_imgs)
+        del ft_imgs
+        torch.cuda.empty_cache()
+        f = f.data.cpu()
+        return f
 
     def compute_distance(self, qf, gf):
         distmat = metrics.compute_distance_matrix(qf, gf, self.dist_metric)
