@@ -94,10 +94,12 @@ class REID:
             imgs[i] = torch.unsqueeze(imgs[i], 0)
             imgs[i] = imgs[i].cuda()
         ft_imgs = torch.cat(imgs, 0)
+        # print(f"ft_imgs.size(): {ft_imgs.size()}") -> (batch_size, 3, width, height)
         f = self._extract_features(ft_imgs)
         del ft_imgs
         torch.cuda.empty_cache()
         f = f.data.cpu()
+        # print(f"f.size(): {f.size()}") -> (batch_size, 2048)
         return f
 
     def compute_distance(self, qf, gf):
