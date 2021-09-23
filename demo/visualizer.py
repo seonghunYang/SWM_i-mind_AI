@@ -381,8 +381,8 @@ class AVAVisualizer(object):
                 bg_colors = []
 
                 for category_id in show_idx:
-                    if category_id in self.exclude_id:
-                        continue
+                    # if category_id in self.exclude_id:
+                    #     continue
                     label = self.cate_to_show[category_id]
                     conf = " %.2f" % score[category_id]
                     caption = label + conf
