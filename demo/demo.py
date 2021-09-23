@@ -30,6 +30,7 @@ from PIL import Image
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
+import cProfile
 
 def main():
     parser = argparse.ArgumentParser(description='Action Detection Demo')
@@ -194,7 +195,8 @@ def main():
                     break
 
                 if args.realtime:
-                    if args.detector == "tracker2":
+                    if len(orig_img.shape) == 4:
+                    # if args.detector == "tracker2":
                         orig_img = np.array(orig_img[0, :, :, :])
                     result = ava_predictor_worker.read()
                     flag = video_writer.realtime_write_frame(result, orig_img, boxes, scores, ids)
@@ -253,7 +255,7 @@ def main():
         print("Keyboard Interrupted")
 
     if not args.realtime:
-        threshold = 280
+        threshold = 320
         exist_ids = set()
         final_fuse_id = dict()
         if args.reid:
