@@ -12,3 +12,6 @@ yapf
 isort
 imageio
 scikit-learn==0.22.2
+pandas
+seaborn
+annoy
