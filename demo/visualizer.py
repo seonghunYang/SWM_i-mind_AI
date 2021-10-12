@@ -320,7 +320,7 @@ class AVAVisualizer(object):
 
                 # Logging
                 if self.personal_logger.activities:
-                    self.personal_logger.log(self.frame_num)
+                    self.personal_logger.log(self.frame_num, round(mills))
 
                 new_frame = self.visual_frame(frame, last_visual_mask)
                 out_vid.write(new_frame)
