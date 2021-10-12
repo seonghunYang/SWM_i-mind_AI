@@ -27,6 +27,10 @@ from annoy import AnnoyIndex
 import time
 from torchreid.data.transforms import build_transforms
 from PIL import Image
+import json
+from catch_aws_client import AWSClient
+from catch_logger import EmotionLogger
+from catch_emotion import EmotionPredictor
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
@@ -130,6 +134,30 @@ def main():
         help="do re-identification",
         action="store_true",
     )
+    parser.add_argument(
+        "--s3",
+        default=False,
+        help="analyze s3 video",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--s3-file-key",
+        default='public/test/double_single.mp4',
+        help="analyze s3 video",
+        type=str
+    )
+    parser.add_argument(
+        "--final-output-path",
+        default="final_output.mp4",
+        help="The path to the video final output",
+        type=str,
+    )
+    parser.add_argument(
+        "--s3-upload-key",
+        default='public/test/final_output.mp4',
+        help="upload file with file key",
+        type=str
+    )
 
     args = parser.parse_args()
 
@@ -148,8 +176,18 @@ def main():
     reid = REID()
     print("ReID model loaded")
 
+    aws_client = AWSClient()
+    aws_client.start_face_detection()
+    aws_client.get_face_detection()
+
     if args.webcam:
         print('Starting webcam demo, press Ctrl + C to terminate...')
+    elif args.s3:
+        save_path = 'downloaded.mp4'
+        print('Downloading video file ...')
+        aws_client.download_file(args.s3_file_key, save_path)
+        print(f'Downloaded: {save_path}')
+        args.input_path = args.video_path = save_path
     else:
         print('Starting video demo, video path: {}'.format(args.video_path))
 
@@ -347,6 +385,17 @@ def main():
 
     video_writer.close()
     ava_predictor_worker.terminate()
+
+    all_rekog_results = aws_client.get_all_rekog_results()
+    face_boxes_and_emotions_by_timestamp = aws_client.get_face_boxes_and_emotions(all_rekog_results)
+
+    emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
+    emotion_predictor = EmotionPredictor(args.output_path)
+    emotion_predictor.predict_emotion(args.final_output_path)
+
+    print('Uploading final output video...')
+    aws_client.upload_file(args.final_output_path, args.s3_upload_key)
+    print(f'Uploaded: {args.final_output_path}')
 
 if __name__ == "__main__":
     main()
