@@ -17,7 +17,7 @@ class PersonalLogger():
 
         # file handler 객체 생성
         os.makedirs(path, exist_ok=True)
-        file_handler = logging.FileHandler(filename=path+'/person.log')
+        file_handler = logging.FileHandler(filename=path+'/action.log')
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
