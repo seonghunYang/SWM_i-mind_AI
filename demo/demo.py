@@ -152,12 +152,6 @@ def main():
         help="The path to the video final output",
         type=str,
     )
-    parser.add_argument(
-        "--s3-upload-key",
-        default='public/test/final_output.mp4',
-        help="upload file with file key",
-        type=str
-    )
 
     args = parser.parse_args()
 
@@ -177,8 +171,6 @@ def main():
     print("ReID model loaded")
 
     aws_client = AWSClient()
-    aws_client.start_face_detection()
-    aws_client.get_face_detection()
 
     if args.webcam:
         print('Starting webcam demo, press Ctrl + C to terminate...')
@@ -188,8 +180,14 @@ def main():
         aws_client.download_file(args.s3_file_key, save_path)
         print(f'Downloaded: {save_path}')
         args.input_path = args.video_path = save_path
+        print('Call rekognition api...')
+        aws_client.start_face_detection(args.s3_file_key)
+        aws_client.get_face_detection()
+        print('Called.')
     else:
         print('Starting video demo, video path: {}'.format(args.video_path))
+        aws_client.upload_file()
+
 
     fuse_queue = torch.multiprocessing.Queue()
     # Initialise Visualizer
@@ -386,16 +384,32 @@ def main():
     video_writer.close()
     ava_predictor_worker.terminate()
 
-    all_rekog_results = aws_client.get_all_rekog_results()
-    face_boxes_and_emotions_by_timestamp = aws_client.get_face_boxes_and_emotions(all_rekog_results)
+    if args.s3:
+        all_rekog_results = aws_client.get_all_rekog_results()
+        face_boxes_and_emotions_by_timestamp = aws_client.get_face_boxes_and_emotions(all_rekog_results)
 
-    emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
-    emotion_predictor = EmotionPredictor(args.output_path)
-    emotion_predictor.predict_emotion(args.final_output_path)
+        splited_by_path = args.s3_file_key.split('/')
+        splited_by_bar = splited_by_path[-1].split('_')
 
-    print('Uploading final output video...')
-    aws_client.upload_file(args.final_output_path, args.s3_upload_key)
-    print(f'Uploaded: {args.final_output_path}')
+        video_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_processed.mp4'
+        action_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_action.log'
+        emotion_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_emotion.log'
+
+        emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
+        emotion_predictor = EmotionPredictor(args.output_path)
+        emotion_predictor.predict_emotion(args.final_output_path)
+
+        print('Uploading final output video...')
+        aws_client.upload_file(args.final_output_path, video_upload_key)
+        print(f'Uploaded: [LOCAL]{args.final_output_path} → [S3 Bucket]{video_upload_key}')
+
+        print('Uploading action log...')
+        aws_client.upload_file('../logs/action.log', action_upload_key)
+        print(f'Uploaded: [LOCAL]../logs/action.log → [S3 Bucket]{action_upload_key}')
+
+        print('Uploading emotion log...')
+        aws_client.upload_file('../logs/emotion.log', emotion_upload_key)
+        print(f'Uploaded: [LOCAL]../logs/emotion.log → [S3 Bucket]{emotion_upload_key}')
 
 if __name__ == "__main__":
     main()
