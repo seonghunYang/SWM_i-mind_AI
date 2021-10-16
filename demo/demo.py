@@ -18,7 +18,7 @@ import torch
 from reid import REID
 import operator
 
-from visualizer import AVAVisualizer
+from visualizer import AVAVisualizer, EmotionVisualizer
 from action_predictor import AVAPredictorWorker
 
 #pytorch issuse #973
@@ -30,7 +30,6 @@ from PIL import Image
 import json
 from catch_aws_client import AWSClient
 from catch_logger import EmotionLogger
-from catch_emotion import EmotionPredictor
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
@@ -186,8 +185,6 @@ def main():
         print('Called.')
     else:
         print('Starting video demo, video path: {}'.format(args.video_path))
-        aws_client.upload_file()
-
 
     fuse_queue = torch.multiprocessing.Queue()
     # Initialise Visualizer
@@ -396,8 +393,8 @@ def main():
         emotion_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_emotion.log'
 
         emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
-        emotion_predictor = EmotionPredictor(args.output_path)
-        emotion_predictor.predict_emotion(args.final_output_path)
+        emotion_visualizer = EmotionVisualizer(args.output_path)
+        emotion_visualizer.output(args.final_output_path)
 
         print('Uploading final output video...')
         aws_client.upload_file(args.final_output_path, video_upload_key)
