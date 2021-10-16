@@ -1,9 +1,9 @@
 import logging, os, time
 import json
 
-class PersonalLogger():
+class ActionLogger():
     def __init__(self, path):
-        self.logger = logging.getLogger('PersonalLogger')
+        self.logger = logging.getLogger('ActionLogger')
         
         self.logger.setLevel(logging.DEBUG)
 
@@ -22,22 +22,30 @@ class PersonalLogger():
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
-        self.activities = []
+        self.logs = {}
         self.personal_log = {}
 
-    def add_person(self, input):
-        name, action, x1, y1, x2, y2 = input
-        person = {'name': name, 'action': action, 'pos': [x1, y1, x2, y2]}
-        self.activities.append(person)
+    def add_action(self, input):
+        timestamp, frame_num, id, action, x1, y1, x2, y2 = input
 
-    def log(self, frame_num, timestamp):
-        now = time.localtime()
-        self.personal_log['time'] = f'{now.tm_year:04d}-{now.tm_mon:02d}-{now.tm_mday:02d} {now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}'
-        self.personal_log['activities'] = self.activities
-        self.personal_log['fn'] = frame_num
-        self.personal_log['timestamp'] = timestamp
-        self.logger.info(json.dumps(self.personal_log))
-        self.activities = []
+        if timestamp not in self.logs:
+            self.logs[timestamp] = {}
+
+        if id not in self.logs[timestamp]:
+            self.logs[timestamp][id] = {'pos': [x1, y1, x2, y2], 'actions': []}
+
+        splited = action.split(' ')
+
+        self.logs[timestamp][id]['actions'].append({'action': ' '.join(splited[:-1]), 'confidence': float(splited[-1])})
+
+
+    def save(self):
+        # now = time.localtime()
+        # self.personal_log['time'] = f'{now.tm_year:04d}-{now.tm_mon:02d}-{now.tm_mday:02d} {now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}'
+        # self.personal_log['activities'] = self.activities
+        # self.personal_log['fn'] = frame_num
+        # self.personal_log['timestamp'] = timestamp
+        self.logger.info(json.dumps(self.logs))
 
 class EmotionLogger():
     def __init__(self, path):
