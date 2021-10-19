@@ -3,13 +3,10 @@ import cv2
 
 # AWS Rekognition
 class AWSClient:
-    def __init__(self):
+    def __init__(self, bucket_name):
         # self.S3_ACCESS_KEY_ID = '...'
         # self.S3_SECRET_ACCESS_KEY = '...'
-        self.BUCKET_NAME = 'test.i-mind101.com'
-        self.PREFIX = 'public/test/'
-        self.FILE_NAME = 'double_single.mp4'
-        self.FILE_KEY = self.PREFIX+self.FILE_NAME
+        self.BUCKET_NAME = bucket_name
 
         print('Creating AWS S3, Rekognition')
         self.s3 = boto3.resource(

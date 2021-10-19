@@ -140,6 +140,12 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--bucket-name",
+        default='drmaemi.com',
+        help="s3 bucket name to create aws client object",
+        type=str,
+    )
+    parser.add_argument(
         "--s3-file-key",
         default='public/test/double_single.mp4',
         help="analyze s3 video",
@@ -169,11 +175,12 @@ def main():
     reid = REID()
     print("ReID model loaded")
 
-    aws_client = AWSClient()
+    aws_client = None
 
     if args.webcam:
         print('Starting webcam demo, press Ctrl + C to terminate...')
     elif args.s3:
+        aws_client = AWSClient(args.bucket_name)
         save_path = 'downloaded.mp4'
         print('Downloading video file ...')
         aws_client.download_file(args.s3_file_key, save_path)
