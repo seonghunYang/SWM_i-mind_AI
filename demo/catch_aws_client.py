@@ -162,7 +162,8 @@ class AWSClient:
                 face_boxes_and_emotions_by_timestamp[timestamp].append(
                     {
                         'pos': (l, t, r, b),
-                        'emotions': detection['Face']['Emotions']
+                        'emotions': detection['Face']['Emotions'],
+                        'age_range': (detection['Face']['AgeRange']['Low'], detection['Face']['AgeRange']['High'])
                     }
                 )
 
