@@ -30,6 +30,7 @@ from PIL import Image
 import json
 from catch_aws_client import AWSClient
 from catch_logger import EmotionLogger
+from postprocessor import LogReconstructor
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
@@ -325,7 +326,7 @@ def main():
                                 for key, item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
                                     if i in item:
                                         unpickable += final_fuse_id[key]
-                            print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
+                            # print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
 
                             for oid in (exist_ids-set(unpickable))&set(final_fuse_id.keys()):
                                 try:
@@ -398,10 +399,15 @@ def main():
         video_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_processed.mp4'
         action_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_action.log'
         emotion_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_emotion.log'
+        acsv_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_A.csv'
+        ccsv_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_C.csv'
 
         emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
         emotion_visualizer = EmotionVisualizer(args.output_path)
         emotion_visualizer.output(args.final_output_path)
+
+        log_reconstructor = LogReconstructor('../logs/action.log', '../logs/emotion.log')
+        log_reconstructor.reconstruct()
 
         print('Uploading final output video...')
         aws_client.upload_file(args.final_output_path, video_upload_key)
@@ -414,6 +420,14 @@ def main():
         print('Uploading emotion log...')
         aws_client.upload_file('../logs/emotion.log', emotion_upload_key)
         print(f'Uploaded: [LOCAL]../logs/emotion.log → [S3 Bucket]{emotion_upload_key}')
+
+        print('Uploading adult object csv...')
+        aws_client.upload_file('../logs/A.csv', acsv_upload_key)
+        print(f'Uploaded: [LOCAL]../logs/A.csv → [S3 Bucket]{emotion_upload_key}')
+
+        print('Uploading child object csv...')
+        aws_client.upload_file('../logs/C.csv', ccsv_upload_key)
+        print(f'Uploaded: [LOCAL]../logs/C.csv → [S3 Bucket]{emotion_upload_key}')
 
 if __name__ == "__main__":
     main()
