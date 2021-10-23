@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 
-class LogReconstructer:
+class LogReconstructor:
     def __init__(self, action_logs_path, emotion_logs_path):
         with open(action_logs_path, 'r') as f:
             self.action_logs = json.load(f)
@@ -149,6 +149,14 @@ class LogReconstructer:
                 self.composed_dataframes_by_id[obj_id] = df
 
     def save(self):
+        self.ids_with_ages = [(obj_id, df.age_avg.mean()) for obj_id, df in self.composed_dataframes_by_id.items()]
+
+        self.ids_with_ages.sort(key=lambda x:x[1])
+
+        self.composed_dataframes_by_id[self.ids_with_ages[-1][0]].to_csv(f'../logs/A.csv', index=False)
+        self.composed_dataframes_by_id[self.ids_with_ages[0][0]].to_csv(f'../logs/C.csv', index=False)
+
+    def save_old(self):
         appeared_by_role = {'A': False, 'C': False}
 
         for df in self.composed_dataframes_by_id.values():
@@ -156,8 +164,15 @@ class LogReconstructer:
                 obj_role = 'C' if df.age_avg.mean() < 10 else 'A'
 
                 if not appeared_by_role[obj_role]:
-                    df.to_csv(f'{obj_role}.csv')
+                    df.to_csv(f'../logs/{obj_role}.csv')
                     appeared_by_role[obj_role] = True
 
                     if all(list(appeared_by_role.values())):
                         break
+
+    def reconstruct(self):
+        self.get_emotions_id()
+        self.get_emotion_dataframes()
+        self.get_action_dataframes()
+        self.get_composed_dataframes()
+        self.save()
