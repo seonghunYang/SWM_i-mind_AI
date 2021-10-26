@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import json
+import moviepy.editor as mp
 
 class LogReconstructor:
     def __init__(self, action_logs_path, emotion_logs_path):
@@ -176,3 +177,13 @@ class LogReconstructor:
         self.get_action_dataframes()
         self.get_composed_dataframes()
         self.save()
+
+
+class MoviePyUser:
+    def composite_audio_to_video(self, audio_clip_path, video_clip_path, output_path):
+        audio_clip = mp.AudioFileClip(audio_clip_path)
+        video_clip = mp.VideoFileClip(video_clip_path)
+
+        video_clip.audio = audio_clip
+
+        video_clip.write_videofile(output_path)

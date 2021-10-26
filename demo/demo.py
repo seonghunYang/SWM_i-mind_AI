@@ -3,6 +3,8 @@
 # Written by DrMaemi (leesh1510@ajou.ac.kr)
 # -----------------------------------------------------
 import sys
+
+from demo.postprocessor import MoviePyUser
 # print(f"\n\nsys.path: {sys.path}\n\n")
 sys.path.insert(0, '../detector/Yolov5_DeepSort_Pytorch')
 sys.path.insert(0, '../detector/Yolov5_DeepSort_Pytorch/yolov5')
@@ -52,8 +54,8 @@ def main():
     )
     parser.add_argument(
         "--output-path",
-        default="output.mp4",
-        help="The path to the video output",
+        default="action_visualized.mp4",
+        help="The path to the video processed action output",
         type=str,
     )
     parser.add_argument(
@@ -154,7 +156,7 @@ def main():
     )
     parser.add_argument(
         "--final-output-path",
-        default="final_output.mp4",
+        default="processed.mp4",
         help="The path to the video final output",
         type=str,
     )
@@ -177,16 +179,17 @@ def main():
     print("ReID model loaded")
 
     aws_client = None
+    s3_download_path = 'downloaded.mp4'
+    video_processed_emotion_path = 'action_emotion_visualized.mp4'
 
     if args.webcam:
         print('Starting webcam demo, press Ctrl + C to terminate...')
     elif args.s3:
         aws_client = AWSClient(args.bucket_name)
-        save_path = 'downloaded.mp4'
         print('Downloading video file ...')
-        aws_client.download_file(args.s3_file_key, save_path)
-        print(f'Downloaded: {save_path}')
-        args.input_path = args.video_path = save_path
+        aws_client.download_file(args.s3_file_key, s3_download_path)
+        print(f'Downloaded: {s3_download_path}')
+        args.input_path = args.video_path = s3_download_path
         print('Call rekognition api...')
         aws_client.start_face_detection(args.s3_file_key)
         aws_client.get_face_detection()
@@ -390,6 +393,8 @@ def main():
     ava_predictor_worker.terminate()
 
     if args.s3:
+        moviepy_user = MoviePyUser()
+
         all_rekog_results = aws_client.get_all_rekog_results()
         face_boxes_and_emotions_by_timestamp = aws_client.get_face_boxes_and_emotions(all_rekog_results)
 
@@ -404,7 +409,9 @@ def main():
 
         emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
         emotion_visualizer = EmotionVisualizer(args.output_path)
-        emotion_visualizer.output(args.final_output_path)
+        emotion_visualizer.output(video_processed_emotion_path)
+
+        moviepy_user.composite_audio_to_video(s3_download_path, video_processed_emotion_path, args.final_output_path)
 
         log_reconstructor = LogReconstructor('../logs/action.log', '../logs/emotion.log')
         log_reconstructor.reconstruct()
