@@ -4,7 +4,7 @@
 # -----------------------------------------------------
 import sys
 
-from demo.postprocessor import MoviePyUser
+from postprocessor import MoviePyUser
 # print(f"\n\nsys.path: {sys.path}\n\n")
 sys.path.insert(0, '../detector/Yolov5_DeepSort_Pytorch')
 sys.path.insert(0, '../detector/Yolov5_DeepSort_Pytorch/yolov5')
@@ -430,11 +430,11 @@ def main():
 
         print('Uploading adult object csv...')
         aws_client.upload_file('../logs/A.csv', acsv_upload_key)
-        print(f'Uploaded: [LOCAL]../logs/A.csv → [S3 Bucket]{emotion_upload_key}')
+        print(f'Uploaded: [LOCAL]../logs/A.csv → [S3 Bucket]{acsv_upload_key}')
 
         print('Uploading child object csv...')
         aws_client.upload_file('../logs/C.csv', ccsv_upload_key)
-        print(f'Uploaded: [LOCAL]../logs/C.csv → [S3 Bucket]{emotion_upload_key}')
+        print(f'Uploaded: [LOCAL]../logs/C.csv → [S3 Bucket]{ccsv_upload_key}')
 
 if __name__ == "__main__":
     main()
