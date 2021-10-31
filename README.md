@@ -1,14 +1,15 @@
-# CatchNet
-<p>CatchNet은 서비스 Catch에서 사용하는 AI 파이프라인 네트워크이다. 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 어린이집 CCTV 환경에서 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
+# i-mind-net
+
+<p>i-mind-net은 서비스 Catch에서 사용하는 AI 파이프라인 네트워크이다. 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 어린이집 CCTV 환경에서 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
 
 <br>
 
 ## 동작 환경
 <p>
 
-- RAM: 최소 8GB (16GB 이상 권장)
+- RAM: 최소 16GB
 - GPU: GTX 960 이상
-- OS: Ubuntu 20.04
+- OS: Ubuntu 18.04
 - Tools: CUDA, Python, Anaconda, PyTorch, Tensorflow 2.0+
 </p>
 
@@ -19,8 +20,8 @@
 
 
 ```
-conda create -n CatchNet python=3.7 -y
-conda activate CatchNet
+conda create -n i-mind-net python=3.7 -y
+conda activate i-mind-net
 conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=11 -c pytorch -c conda-forge -y
 # install pytorch with the same cuda version as in your environment
 # cuda_version=$(nvcc --version | grep -oP '(?<=release )[\d\.]*?(?=,)')
@@ -29,11 +30,10 @@ conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=11 -c pytorch -c con
 conda install av -c conda-forge -y
 conda install cython -y
 
-gt clone https://git.swmgit.org/swm-12/12_swm11/i-mind.git
-cd i-mind/CatchNet
+git clone https://git.swmgit.org/swm-12/12_swm11/i-mind-net.git
+cd i-mind/i-mind-net
 pip install -e . # Other dependicies will be installed here
 pip install -r requirements.txt
-pip install tensorflow
 ```
 </p>
 
