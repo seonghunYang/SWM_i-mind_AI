@@ -1,6 +1,8 @@
 # i-mind-net
+<p>
 
-<p>i-mind-net은 서비스 Catch에서 사용하는 AI 파이프라인 네트워크이다. 최신 트랜드의 AI 컴퓨터 비전 기술인 얼굴 식별, 객체 추적 및 행동 인식 기술을 활용하여 어린이집 CCTV 환경에서 자동으로 아이의 성장 지표와 원내 생활 등 다양하고 균형있는 정보를 제공한다.</p>
+소프트웨어 마에스트로 12기 i-mind팀 서비스 *i-mind*의 핵심 AI 파이프라인
+</p>
 
 <br>
 
@@ -11,6 +13,43 @@
 - GPU: GTX 960 이상
 - OS: Ubuntu 18.04
 - Tools: CUDA, Python, Anaconda, PyTorch, Tensorflow 2.0+
+</p>
+
+<br>
+
+## 전체 프로세스
+<p>
+  <div align="center">
+    <figure>
+        <img src="https://drive.google.com/uc?export=view&id=1iYWmfFo3YUyHv9JvUb9_QBbi4-rsT-Iu" alt="i-mind-net 전체 프로세스">
+        <div align="center"><figcation>i-mind-net 전체 프로세스</figcation></div>
+    </figure>
+  </div>
+</p>
+
+<p>
+
+*i-mind-net*은 크게 두 트랙으로 병렬 처리됩니다. 하나는 객체의 행동을 인식하기 위한 트랙이고, 다른 하나는 객체의 표정과 감정을 인식하기 위한 트랙입니다. 
+</p>
+
+### 1. 행동 인식
+<p>
+
+행동 인식을 위해서 Object Detector & Tracker, Video Model(SlowFast 네트워크)과 Action Detector를 거칩니다. 비디오를 여러 개의 클립으로 자르고, 클립의 각 프레임을 통해 Object Detector & Tracker에서 객체의 위치 정보와 추적 정보를 얻습니다. 동시에 클립이 Video Model에 입력되어 클립 전체의 특징 벡터들을 추출합니다.
+</p>
+
+<p>
+  <div align="center">
+    <figure>
+        <img src="https://drive.google.com/uc?export=view&id=1yd1MTwPDI2VulU0jUwwl66tJ17IY5tBG" alt="행동 인식 프로세스">
+        <div align="center"><figcation>행동 인식 프로세스</figcation></div>
+    </figure>
+  </div>
+</p>
+
+<p>
+
+추출한 특징 벡터들로부터 객체의 위치 정보를 바탕으로 객체들의 특징 벡터들을 RoI Align 후 사람 객체의 특징 벡터를 통해 비디오의 temporal 정보를 업데이트합니다. 최종적으로 업데이트된 메모리 특징 벡터와 사람 객체의 특징 벡터, 사물의 특징 벡터를 상호작용 통합(Interaction Aggregation, IA) 네트워크에 입력하여 행동을 인식합니다.
 </p>
 
 <br>
