@@ -531,7 +531,7 @@ class EmotionVisualizer:
             pos_msec = self.cap.get(cv2.CAP_PROP_POS_MSEC)
 
             try:
-                if abs(pos_msec-timestamps[pivot]) < 15:
+                if abs(pos_msec-timestamps[pivot]) < 2*delay:
                     prev_faces = faces = face_boxes_and_emotions_by_timestamp[str(timestamps[pivot])]
                     for face in faces:
                         l, t, r, b = face['pos']
