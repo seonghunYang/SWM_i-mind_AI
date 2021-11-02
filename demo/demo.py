@@ -37,6 +37,7 @@ from postprocessor import LogReconstructor
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (rlimit[1], rlimit[1]))
 import cProfile
+import cv2
 
 def main():
     parser = argparse.ArgumentParser(description='Action Detection Demo')
@@ -102,7 +103,7 @@ def main():
     )
     parser.add_argument(
         "--detect-rate",
-        default=4,
+        default=2,
         help="Rate(fps) to update action labels",
         type=int
     )
@@ -197,6 +198,10 @@ def main():
     else:
         print('Starting video demo, video path: {}'.format(args.video_path))
 
+    cap = cv2.VideoCapture(args.input_path)
+    fn = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
     fuse_queue = torch.multiprocessing.Queue()
     # Initialise Visualizer
     video_writer = AVAVisualizer(
@@ -229,7 +234,7 @@ def main():
     
     print("Showing tracking progress bar (in fps). Other processes are running in the background.")
     try:
-        for i in tqdm(count(), desc="Tracker Progress", unit=" frame"):
+        for i in tqdm(range(fn+1), desc="Tracker Progress", unit=" frame"):
             with torch.no_grad():
                 (orig_img, boxes, scores, ids) = ava_predictor_worker.read_track()
 
@@ -306,14 +311,13 @@ def main():
             ann_tree_build_start = time.time()
             ann_tree_size = 5
             ann.build(ann_tree_size)
-            print(f"Annoy tree build took {round(time.time()-ann_tree_build_start, 3)} seconds")
 
             reid_start = time.time()
             for f in ids_per_frame:
                 if f:
                     if len(exist_ids) == 0:
-                        for i in f:
-                            final_fuse_id[i] = [i]
+                        for id in f:
+                            final_fuse_id[id] = [id]
 
                         exist_ids = exist_ids or f
                     else:
@@ -325,9 +329,9 @@ def main():
                                 continue
 
                             unpickable = []
-                            for i in f: # f = ids
+                            for id in f: # f = ids
                                 for key, item in final_fuse_id.items(): # {key: 병합된 id, value: 병합되기 전 id들 리스트}
-                                    if i in item:
+                                    if id in item:
                                         unpickable += final_fuse_id[key]
                             # print('exist_ids {} unpickable {}'.format(exist_ids, unpickable))
 
@@ -391,6 +395,7 @@ def main():
 
     video_writer.close()
     ava_predictor_worker.terminate()
+    print('AVA predictor worker terminated.')
 
     if args.s3:
         moviepy_user = MoviePyUser()
@@ -408,7 +413,9 @@ def main():
         ccsv_upload_key = '/'.join(splited_by_path[:-1])+'/'+'_'.join(splited_by_bar[:-1])+'_C.csv'
 
         emotion_logger = EmotionLogger('../logs').log(face_boxes_and_emotions_by_timestamp)
+        print('Creating emotion visualizer...')
         emotion_visualizer = EmotionVisualizer(args.output_path)
+        print('Visualizing emotion rekognition results...')
         emotion_visualizer.output(video_processed_emotion_path)
 
         moviepy_user.composite_audio_to_video(s3_download_path, video_processed_emotion_path, args.final_output_path)

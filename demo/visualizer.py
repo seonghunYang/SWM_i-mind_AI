@@ -511,7 +511,7 @@ class EmotionVisualizer:
 
         width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        count = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        fn = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = self.cap.get(cv2.CAP_PROP_FPS)
         delay = int(1000/fps)
 
@@ -522,7 +522,7 @@ class EmotionVisualizer:
         pivot = 0
         prev_faces = []
         
-        while True:
+        for i in tqdm(range(fn), desc="Emotion Visualizer", unit=" frame"):
             ret, frame = self.cap.read()
 
             if not ret:
