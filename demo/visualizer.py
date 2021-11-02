@@ -492,7 +492,7 @@ class AVAVisualizer(object):
         while not self.done_queue.empty():
             _ = self.done_queue.get()
             cnt += 1
-        pbar = tqdm(total=total, initial=cnt, desc="Video Writer", unit=" frame")
+        pbar = tqdm(total=total, initial=cnt, desc="Action Visualizer", unit=" frame")
         # update bar
         while cnt < total:
             _ = self.done_queue.get()

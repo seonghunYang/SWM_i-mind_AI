@@ -235,7 +235,7 @@ class VideoDetectionLoader(object):
         if predictor_process != -1:
             tqdm.write("Tracking finished. Showing feature extraction progress bar [ ready length / total length ](in msec).")
             initial = predictor_process - self.start_mill
-            pbar = tqdm(total=int(last_millis)-self.start_mill, initial=initial, desc="Feature Extraction")
+            pbar = tqdm(total=int(last_millis), initial=initial, desc="Feature Extraction")
             last_pos = initial
             while predictor_process != -1:
                 pbar.update(predictor_process-last_pos)

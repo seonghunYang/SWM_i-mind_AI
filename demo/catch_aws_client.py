@@ -107,7 +107,9 @@ class AWSClient:
             JobId=self.start_face_detection_response['JobId'],
             MaxResults=123
         )
-        print(f'get_face_detection_response: {self.get_face_detection_response}')
+
+        job_status = self.get_face_detection_response['JobStatus']
+        print(f'get_face_detection_response: {job_status}')
 
     def get_next(self):
         if 'NextToken' in self.get_face_detection_response:
