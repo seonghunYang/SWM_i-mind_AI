@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from PIL import Image, ImageFont, ImageDraw
 import torch.multiprocessing as mp
-from catch_logger import ActionLogger
+from catch_logger import ActionLogger, ActionPredictionLogger
 import json
 
 cv2.setNumThreads(0)
@@ -201,6 +201,7 @@ class AVAVisualizer(object):
 
         self.action_dictionary = {}
         self.action_logger = ActionLogger('../logs')
+        self.action_prediction_logger = ActionPredictionLogger('../logs')
         self.frame_num = 0
 
         if realtime:
@@ -456,6 +457,7 @@ class AVAVisualizer(object):
 
                 # Logging Personal Data
                 self.action_logger.add_action((rounded_mills, frame_num, id, caption, x1, y1, x2, y2))
+                self.action_prediction_logger.log((rounded_mills, frame_num, id, caption, x1, y1, x2, y2))
 
             result_vis = Image.alpha_composite(result_vis, overlay)
 
